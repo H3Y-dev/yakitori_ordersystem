@@ -290,8 +290,9 @@ let state = {
 };
 let knownIds = new Set();
 let firstLoad = true;
+let activeStockSaves = 0; // 追加：在庫を保存している最中かを判定するフラグ
 
-// ユーザーがテキスト入力中の状態かを判定するヘルパー[cite: 1]
+// ユーザーがテキスト入力中の状態かを判定するヘルパー
 function isUserTyping() {
   const active = document.activeElement;
   return active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
@@ -300,7 +301,7 @@ function isUserTyping() {
 function render(){
   const root = document.getElementById('root');
 
-  // 再描画で入力中のフォーカスが飛ばないよう、直前の状態を控えておく[cite: 1]
+  // 再描画で入力中のフォーカスが飛ばないよう、直前の状態を控えておく
   const active = document.activeElement;
   let focusKey = null, selStart = null, selEnd = null;
   if(active && active.tagName === 'INPUT' && active.dataset && active.dataset.focusKey){
@@ -319,7 +320,7 @@ function render(){
     root.appendChild(renderGrillScreen());
   }
 
-  // フォーカスとカーソル位置を戻す[cite: 1]
+  // フォーカスとカーソル位置を戻す
   if(focusKey){
     const again = root.querySelector('input[data-focus-key="' + focusKey + '"]');
     if(again){
@@ -430,7 +431,13 @@ async function fetchOrders(){
     const data = await apiGetData();
     checkForAlerts(data);
 
-    // バックグラウンドデータの比較（変更があったときだけ画面を再更新する）[cite: 1]
+    // 追加：保存中の場合はサーバーの古い在庫データで画面を上書きして巻き戻るのを防ぐ
+    let stockToApply = data.stock;
+    if (activeStockSaves > 0) {
+      stockToApply = state.stock;
+    }
+
+    // バックグラウンドデータの比較（変更があったときだけ画面を再更新する）
     const hasChanged = JSON.stringify({
       orders: state.orders,
       log: state.log,
@@ -439,17 +446,17 @@ async function fetchOrders(){
     }) !== JSON.stringify({
       orders: data.orders,
       log: data.log,
-      stock: data.stock,
+      stock: stockToApply,
       restock: data.restock
     });
 
     if (hasChanged) {
       state.orders = data.orders;
       state.log = data.log;
-      state.stock = data.stock;
+      state.stock = stockToApply;
       state.restock = data.restock;
 
-      // ユーザーがタイピング・入力中でない場合のみ再描画を実行[cite: 1]
+      // ユーザーがタイピング・入力中でない場合のみ再描画を実行
       if (!isUserTyping()) {
         state.now = Date.now();
         render();
@@ -459,7 +466,7 @@ async function fetchOrders(){
     console.error('注文取得エラー:', e);
   }
   state.now = Date.now();
-  updateElapsedTimes(); // 全画面更新せず時間表示のテキストノードのみ更新（軽量）[cite: 1]
+  updateElapsedTimes(); // 全画面更新せず時間表示のテキストノードのみ更新（軽量）
 }
 
 async function resetAllData(){
@@ -533,7 +540,7 @@ setInterval(()=>{
   }
 }, 9000);
 
-// 番号入力中、関係する部分だけ更新する[cite: 1]
+// 番号入力中、関係する部分だけ更新する
 function updateNumberUi(){
   const num = state.orderNumber.trim();
   const dupe = num !== '' && state.orders.some(o=>o.status!=='served' && String(o.number)===num);
@@ -632,32 +639,37 @@ async function serveFromStock(){
   }
 }
 
-async function setStock(flavor, value){
-  const n = Math.max(0, parseInt(value, 10) || 0);
-  try{
+// 追加：操作した数値を即座に画面に反映しつつ、裏でサーバーへ保存する統合関数
+async function saveStockToServer(flavor, newVal) {
+  // ① 即座にローカルの状態を更新し、もっさり感やカクつきをなくす（オプティミスティックUI）
+  state.stock[flavor] = newVal;
+  render();
+
+  // ② 保存中のフラグを立てて、裏の定期更新で上書きされないようにする
+  activeStockSaves++;
+  try {
     const data = await apiGetData();
     const newStock = Object.assign({}, data.stock);
-    newStock[flavor] = n;
+    newStock[flavor] = newVal; // 最新の計算済みの値を保存する
     await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: data.restock });
-    await fetchOrders();
-  }catch(err){
-    console.error('在庫設定エラー:', err);
-    alert('在庫の更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-    await fetchOrders();
+    
+    // 保存後に最新状態を取り直す
+    fetchOrders();
+  } catch(err) {
+    console.error('在庫保存エラー:', err);
+  } finally {
+    activeStockSaves--;
   }
 }
 
-async function adjustStock(flavor, delta){
-  try{
-    const data = await apiGetData();
-    const newStock = Object.assign({}, data.stock);
-    newStock[flavor] = Math.max(0, (newStock[flavor]||0) + delta);
-    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: data.restock });
-    await fetchOrders();
-  }catch(err){
-    console.error('在庫更新エラー:', err);
-    alert('在庫の更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-  }
+function adjustStock(flavor, delta){
+  const newVal = Math.max(0, (state.stock[flavor]||0) + delta);
+  saveStockToServer(flavor, newVal);
+}
+
+function setStock(flavor, value){
+  const newVal = Math.max(0, parseInt(value, 10) || 0);
+  saveStockToServer(flavor, newVal);
 }
 
 async function requestRestock(flavor){
@@ -789,7 +801,7 @@ function renderStockPanel(){
           'data-focus-key':'stock-' + f,
           onFocus:(e)=>{ state.stockEditing[f] = String(state.stock[f] || 0); e.target.select(); },
           onInput:(e)=>{ state.stockEditing[f] = e.target.value; },
-          onBlur:(e)=>{ const v = e.target.value; delete state.stockEditing[f]; setStock(f, v).then(() => render()); },
+          onBlur:(e)=>{ const v = e.target.value; delete state.stockEditing[f]; setStock(f, v); },
           onKeyDown:(e)=>{ if(e.key === 'Enter') e.target.blur(); },
         }),
         el('span', {class:'stock-unit'}, '本')
@@ -843,7 +855,7 @@ function renderOrderScreen(){
     value: state.orderNumber,
     'data-focus-key':'ordernum',
     onInput:(e)=>{ state.orderNumber = e.target.value; updateNumberUi(); },
-    onBlur:()=>{ render(); } // フォーカスが外れたタイミングで全体表示を同期[cite: 1]
+    onBlur:()=>{ render(); } // フォーカスが外れたタイミングで全体表示を同期
   });
   screen.appendChild(numInput);
   screen.appendChild(el('div', {class:'num-warn' + (dupe ? '' : ' is-hidden')},
@@ -935,7 +947,7 @@ function renderOrderSideTicket(o){
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
-      // 経過時間の自動更新用データ属性を付与[cite: 1]
+      // 経過時間の自動更新用データ属性を付与
       el('div', {class:'ticket-time', 'data-created-at': o.createdAt}, elapsed(o.createdAt))
     ]),
     el('div', {class:'status-pill status-'+o.status}, statusLabel(o.status)),
@@ -1013,7 +1025,7 @@ function renderRestockCard(flavor, req){
         el('span', {class:'restock-icon'}, '📦'),
         el('span', {}, flavor + ' の補充依頼')
       ]),
-      // 経過時間の自動更新用データ属性を付与[cite: 1]
+      // 経過時間の自動更新用データ属性を付与
       el('div', {class:'ticket-time', 'data-created-at': req.at}, elapsed(req.at))
     ]),
     el('div', {class:'restock-note'}, req.status==='delivering'
@@ -1053,7 +1065,7 @@ function renderGrillTicket(o){
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
-      // 経過時間の自動更新用データ属性を付与[cite: 1]
+      // 経過時間の自動更新用データ属性を付与
       el('div', {class:'ticket-time', 'data-created-at': o.createdAt}, elapsed(o.createdAt))
     ]),
     el('div', {class:'status-pill status-'+o.status}, statusLabel(o.status)),
@@ -1170,7 +1182,7 @@ function elapsed(createdAt){
   return `${m}:${String(s).padStart(2,'0')} 経過`;
 }
 
-// 画面全体を再描画せず、経過時間の文字列のみをピンポイントで書き換える高速化関数[cite: 1]
+// 画面全体を再描画せず、経過時間の文字列のみをピンポイントで書き換える高速化関数
 function updateElapsedTimes(){
   const now = Date.now();
   document.querySelectorAll('.ticket-time').forEach(el => {
@@ -1188,7 +1200,7 @@ render();
 fetchOrders();
 setInterval(fetchOrders, 2500); // サーバーからの定期取得
 
-// 毎秒の全体再描画(render)を完全に廃止。部分書き換えのみにしてCPU負荷をほぼゼロに[cite: 1]
+// 毎秒の全体再描画(render)を完全に廃止。部分書き換えのみにしてCPU負荷をほぼゼロに
 setInterval(()=>{
   state.now = Date.now();
   if (state.role && !isUserTyping()) {
