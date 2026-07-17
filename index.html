@@ -153,9 +153,14 @@
   .stock-item.is-zero{border-color:var(--danger);}
   .stock-name{font-size:12px; font-weight:700; color:var(--cream);}
   .stock-count{display:flex; align-items:baseline; gap:2px;}
-  .stock-num{font-size:26px; font-weight:900; color:var(--ready); font-variant-numeric:tabular-nums; line-height:1;}
-  .stock-item.is-low .stock-num{color:var(--amber);}
-  .stock-item.is-zero .stock-num{color:var(--danger);}
+  .stock-num-input{
+    width:64px; background:transparent; border:none; border-bottom:2px dashed var(--line);
+    color:var(--ready); font-size:26px; font-weight:900; font-family:inherit;
+    font-variant-numeric:tabular-nums; line-height:1; padding:0 0 2px 0; text-align:center;
+  }
+  .stock-num-input:focus{outline:none; border-bottom-color:var(--ember); background:rgba(255,255,255,0.06);}
+  .stock-item.is-low .stock-num-input{color:var(--amber);}
+  .stock-item.is-zero .stock-num-input{color:var(--danger);}
   .stock-unit{font-size:11px; color:var(--smoke); font-weight:700;}
   .stock-steps{display:flex; gap:6px;}
   .stock-steps button{
@@ -275,6 +280,7 @@ let state = {
   orders: [],
   log: [],           // 提供完了ごとの {skewers, waitSeconds, servedAt} 記録
   stock: {},         // 受付の在庫 {塩コショウ: n, タレ: n}
+  stockEditing: {},  // 在庫を手入力中の味 → 入力中の文字列をそのまま保持する
   restock: {},       // 補充依頼 {塩コショウ: null|{status,at}, タレ: ...}
   cart: {},
   orderNumber: '',   // 受付で手入力する注文番号（整理券の番号など）
@@ -287,6 +293,15 @@ let firstLoad = true;
 
 function render(){
   const root = document.getElementById('root');
+
+  // 再描画で入力中のフォーカスが飛ばないよう、直前の状態を控えておく
+  const active = document.activeElement;
+  let focusKey = null, selStart = null, selEnd = null;
+  if(active && active.tagName === 'INPUT' && active.dataset && active.dataset.focusKey){
+    focusKey = active.dataset.focusKey;
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){}
+  }
+
   root.innerHTML = '';
   if(!state.role){
     root.appendChild(renderRoleSelect());
@@ -296,6 +311,17 @@ function render(){
   } else {
     root.appendChild(renderTopbar('焼き場'));
     root.appendChild(renderGrillScreen());
+  }
+
+  // フォーカスとカーソル位置を戻す
+  if(focusKey){
+    const again = root.querySelector('input[data-focus-key="' + focusKey + '"]');
+    if(again){
+      again.focus({preventScroll:true});
+      if(selStart !== null){
+        try { again.setSelectionRange(selStart, selEnd); } catch(e){}
+      }
+    }
   }
 }
 
@@ -586,6 +612,22 @@ async function serveFromStock(){
   }
 }
 
+// 在庫を指定の本数に直接セットする（キーボード入力の確定時）
+async function setStock(flavor, value){
+  const n = Math.max(0, parseInt(value, 10) || 0);
+  try{
+    const data = await apiGetData();
+    const newStock = Object.assign({}, data.stock);
+    newStock[flavor] = n;
+    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: data.restock });
+    await fetchOrders();
+  }catch(err){
+    console.error('在庫設定エラー:', err);
+    alert('在庫の更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+    await fetchOrders();
+  }
+}
+
 // 在庫の増減（届いた分を足す／数え直しの修正）
 async function adjustStock(flavor, delta){
   try{
@@ -724,7 +766,17 @@ function renderStockPanel(){
     const box = el('div', {class:'stock-item' + (n===0 ? ' is-zero' : (n<=2 ? ' is-low' : ''))}, [
       el('div', {class:'stock-name'}, f),
       el('div', {class:'stock-count'}, [
-        el('span', {class:'stock-num'}, String(n)),
+        el('input', {
+          class:'stock-num-input',
+          type:'text',
+          inputmode:'numeric',
+          value: (f in state.stockEditing) ? state.stockEditing[f] : String(n),
+          'data-focus-key':'stock-' + f,
+          onFocus:(e)=>{ state.stockEditing[f] = String(state.stock[f] || 0); e.target.select(); },
+          onInput:(e)=>{ state.stockEditing[f] = e.target.value; },
+          onBlur:(e)=>{ const v = e.target.value; delete state.stockEditing[f]; setStock(f, v); },
+          onKeyDown:(e)=>{ if(e.key === 'Enter') e.target.blur(); },
+        }),
         el('span', {class:'stock-unit'}, '本')
       ]),
       el('div', {class:'stock-steps'}, [
@@ -774,6 +826,7 @@ function renderOrderScreen(){
     inputmode:'numeric',
     placeholder:'例: 12',
     value: state.orderNumber,
+    'data-focus-key':'ordernum',
     onInput:(e)=>{ state.orderNumber = e.target.value; updateNumberUi(); },
   });
   screen.appendChild(numInput);
