@@ -137,6 +137,72 @@
     padding:14px; color:var(--cream); font-size:22px; font-weight:900; text-align:center;
     font-family:inherit; font-variant-numeric:tabular-nums; letter-spacing:0.05em;
   }
+
+  /* --- 在庫パネル --- */
+  .stock-panel{
+    background:var(--charcoal-2); border:1px solid var(--line); border-radius:14px;
+    padding:12px; margin-bottom:14px;
+  }
+  .stock-head{font-size:11px; font-weight:700; color:var(--smoke); margin-bottom:10px; letter-spacing:0.05em;}
+  .stock-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stock-item{
+    background:var(--charcoal); border:1.5px solid var(--line); border-radius:12px; padding:10px;
+    display:flex; flex-direction:column; gap:7px;
+  }
+  .stock-item.is-low{border-color:rgba(242,166,90,0.5);}
+  .stock-item.is-zero{border-color:var(--danger);}
+  .stock-name{font-size:12px; font-weight:700; color:var(--cream);}
+  .stock-count{display:flex; align-items:baseline; gap:2px;}
+  .stock-num{font-size:26px; font-weight:900; color:var(--ready); font-variant-numeric:tabular-nums; line-height:1;}
+  .stock-item.is-low .stock-num{color:var(--amber);}
+  .stock-item.is-zero .stock-num{color:var(--danger);}
+  .stock-unit{font-size:11px; color:var(--smoke); font-weight:700;}
+  .stock-steps{display:flex; gap:6px;}
+  .stock-steps button{
+    flex:1; height:30px; border-radius:8px; border:none; background:var(--line); color:var(--cream);
+    font-size:15px; font-weight:900; cursor:pointer;
+  }
+  .stock-req-btn{
+    border:none; border-radius:8px; padding:8px; font-size:11px; font-weight:900; cursor:pointer;
+    background:rgba(232,98,44,0.2); color:var(--amber); border:1px solid rgba(242,166,90,0.4);
+  }
+  .stock-req-state{font-size:11px; font-weight:900; color:var(--amber); text-align:center; padding:5px;}
+  .stock-req-state.is-coming{color:var(--ready);}
+  .stock-cancel-btn{
+    background:none; border:none; color:var(--smoke); font-size:10px; text-decoration:underline; cursor:pointer; padding:2px;
+  }
+
+  .stock-ready-note{
+    background:rgba(111,174,92,0.14); border:1px solid rgba(111,174,92,0.45); border-radius:14px;
+    padding:12px 14px; margin-bottom:14px;
+  }
+  .stock-ready-main{font-size:14px; font-weight:900; color:var(--ready);}
+  .stock-ready-sub{font-size:11px; color:var(--smoke); margin-top:3px;}
+  .stock-short-note{
+    font-size:11px; color:var(--amber); background:rgba(242,166,90,0.1);
+    border:1px solid rgba(242,166,90,0.3); border-radius:10px; padding:8px 10px; margin:-8px 0 14px;
+  }
+  .cart-num.is-optional{color:var(--ready); font-size:12px; font-weight:700;}
+  .submit-btn.stock-btn{
+    background:linear-gradient(135deg, var(--ready), var(--ready-2));
+    box-shadow:0 4px 14px rgba(111,174,92,0.35);
+  }
+
+  /* --- 補充依頼カード（焼き場側） --- */
+  .restock-card{
+    background:var(--charcoal-2); border-radius:14px; padding:14px; margin-bottom:10px;
+    border-left:4px solid var(--amber);
+  }
+  .restock-card.is-delivering{border-left-color:var(--ready); opacity:0.75;}
+  .restock-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px;}
+  .restock-title{display:flex; align-items:center; gap:6px; font-size:16px; font-weight:900;}
+  .restock-icon{font-size:15px;}
+  .restock-note{font-size:12px; color:var(--smoke); line-height:1.5;}
+  .ticket-action.restock-action{background:var(--amber); color:var(--charcoal);}
+  .restock-arrival{background:linear-gradient(135deg, var(--ready), var(--ready-2)); box-shadow:0 4px 18px rgba(111,174,92,0.4);}
+  .restock-arrival .arrival-btn{color:var(--ready-2);}
+  .restock-name{font-size:20px;}
+
   .num-input:focus{outline:none; border-color:var(--ember);}
   .num-input.is-dupe{border-color:var(--danger);}
   .num-warn{font-size:11px; color:#ef7c7c; margin-top:6px; text-align:center;}
@@ -192,11 +258,13 @@
 
 <script>
 const MENU = [
-  {name:"塩コショウ", price:150, skewers:1},
-  {name:"タレ", price:150, skewers:1},
-  {name:"塩コショウ5本セット", price:700, skewers:5},
-  {name:"タレ5本セット", price:700, skewers:5},
+  {name:"塩コショウ", price:150, skewers:1, flavor:"塩コショウ"},
+  {name:"タレ", price:150, skewers:1, flavor:"タレ"},
+  {name:"塩コショウ5本セット", price:700, skewers:5, flavor:"塩コショウ"},
+  {name:"タレ5本セット", price:700, skewers:5, flavor:"タレ"},
 ];
+const FLAVORS = ["塩コショウ", "タレ"];
+const STOCK_SERVE_MAX = 4; // この本数以下なら受付の在庫からその場で提供する
 const ORDERS_KEY = "orders-list"; // 使用していないが互換のため残置
 
 const DEFAULT_SEC_PER_SKEWER = 90; // ログが無いうちに使う仮の目安（1本あたり秒）
@@ -206,12 +274,13 @@ let state = {
   role: null,       // 'order' | 'grill'
   orders: [],
   log: [],           // 提供完了ごとの {skewers, waitSeconds, servedAt} 記録
+  stock: {},         // 受付の在庫 {塩コショウ: n, タレ: n}
+  restock: {},       // 補充依頼 {塩コショウ: null|{status,at}, タレ: ...}
   cart: {},
   orderNumber: '',   // 受付で手入力する注文番号（整理券の番号など）
   now: Date.now(),
   showHistory: false,
   soundOn: true,
-  isTyping: false,   // ★フォーカス状態（入力中）を管理するフラグを追加
 };
 let knownIds = new Set();
 let firstLoad = true;
@@ -297,13 +366,21 @@ function renderRoleSelect(){
 // 例: https://script.google.com/macros/s/AKfycb.../exec
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMQtuPCopEBw-fkmbG5pq__OJPbJK03TmoR4aJoY93Rnb3MdoCARu5E7id7zLNmat7/exec";
 
+function emptyStock(){ const s={}; FLAVORS.forEach(f=>s[f]=0); return s; }
+function emptyRestock(){ const r={}; FLAVORS.forEach(f=>r[f]=null); return r; }
+
 async function apiGetData(){
   const res = await fetch(APPS_SCRIPT_URL, { method: 'GET' });
   if(!res.ok) throw new Error('サーバーエラー: ' + res.status);
   const data = await res.json();
-  // 後方互換: 昔の形式（注文の配列そのもの）で保存されていた場合も読める
-  if(Array.isArray(data)) return { orders: data, log: [] };
-  return { orders: data.orders || [], log: data.log || [] };
+  // 後方互換: 昔の形式（注文の配列そのもの／在庫なし）で保存されていた場合も読める
+  if(Array.isArray(data)) return { orders: data, log: [], stock: emptyStock(), restock: emptyRestock() };
+  return {
+    orders: data.orders || [],
+    log: data.log || [],
+    stock: Object.assign(emptyStock(), data.stock || {}),
+    restock: Object.assign(emptyRestock(), data.restock || {}),
+  };
 }
 
 async function apiSaveData(data){
@@ -321,32 +398,38 @@ async function apiSaveData(data){
 async function fetchOrders(){
   try{
     const data = await apiGetData();
-    checkForAlerts(data.orders);
+    checkForAlerts(data);
     state.orders = data.orders;
     state.log = data.log;
+    state.stock = data.stock;
+    state.restock = data.restock;
   }catch(e){
     console.error('注文取得エラー:', e);
     // 取得失敗時は直前の表示をそのまま維持する（空にして注文を消さない）
   }
   state.now = Date.now();
-  if(!state.isTyping) render(); // ★入力中(isTypingがtrue)ならrenderをスキップする
-}
-
-async function saveOrders(orders){
-  await apiSaveData({ orders, log: state.log });
+  render();
 }
 
 async function resetAllData(){
   if(!confirm('全ての注文データを削除します。よろしいですか？')) return;
   const alsoLog = confirm('待ち時間の予測に使うログ（本数・所要時間の記録）も一緒に削除しますか？\n\nOK＝ログも削除 / キャンセル＝注文だけ削除してログは残す');
-  await apiSaveData({ orders: [], log: alsoLog ? [] : state.log });
+  await apiSaveData({
+    orders: [],
+    log: alsoLog ? [] : state.log,
+    stock: emptyStock(),
+    restock: emptyRestock(),
+  });
   knownIds = new Set();
   await fetchOrders();
 }
 
-function checkForAlerts(orders){
+function checkForAlerts(data){
+  const orders = data.orders;
+  const restock = data.restock || {};
   if(firstLoad){
     orders.forEach(o=>knownIds.add(o.id + ':' + o.status));
+    FLAVORS.forEach(f=>{ if(restock[f]) knownIds.add('rs:'+f+':'+restock[f].status); });
     firstLoad = false;
     return;
   }
@@ -356,6 +439,15 @@ function checkForAlerts(orders){
       knownIds.add(key);
       if(state.role==='grill' && o.status==='new') beep();
       if(state.role==='order' && o.status==='ready') beep();
+    }
+  });
+  FLAVORS.forEach(f=>{
+    if(!restock[f]) return;
+    const key = 'rs:'+f+':'+restock[f].status;
+    if(!knownIds.has(key)){
+      knownIds.add(key);
+      if(state.role==='grill' && restock[f].status==='requested') beep();
+      if(state.role==='order' && restock[f].status==='delivering') beep();
     }
   });
 }
@@ -377,10 +469,16 @@ function beep(){
   }catch(e){}
 }
 
-// 受付側で「呼び出し中（運搬中）」の注文が残っている間、聞き逃し防止で繰り返し鳴らす
+// 聞き逃し防止で、対応が必要な状態が残っている間は繰り返し鳴らす
 setInterval(()=>{
-  if(state.role === 'order' && state.orders.some(o=>o.status==='ready')){
-    beep();
+  if(state.role === 'order'){
+    const hasReady = state.orders.some(o=>o.status==='ready');
+    const hasDelivering = FLAVORS.some(f=>state.restock[f] && state.restock[f].status==='delivering');
+    if(hasReady || hasDelivering) beep();
+  }
+  if(state.role === 'grill'){
+    const hasRequest = FLAVORS.some(f=>state.restock[f] && state.restock[f].status==='requested');
+    if(hasRequest) beep();
   }
 }, 9000);
 
@@ -397,7 +495,173 @@ function updateNumberUi(){
 
   const cartCount = Object.values(state.cart).reduce((a,b)=>a+b,0);
   const btn = document.querySelector('.submit-btn');
-  if(btn) btn.disabled = (cartCount===0 || num==='' || state.submitting);
+  if(btn){
+    btn.disabled = canServeFromStock()
+      ? state.submitting
+      : (cartCount===0 || num==='' || state.submitting);
+  }
+}
+
+// ---------- 在庫（受付側で持つ焼き上がり済みの串） ----------
+// カートの中身を味ごとの本数に分解する
+function cartByFlavor(){
+  const by = {}; FLAVORS.forEach(f=>by[f]=0);
+  MENU.forEach(m=>{ by[m.flavor] += (state.cart[m.name]||0) * m.skewers; });
+  return by;
+}
+
+function cartTotalSkewers(){
+  return MENU.reduce((sum,m)=> sum + (state.cart[m.name]||0)*m.skewers, 0);
+}
+
+// 4本以下 かつ 在庫が足りていれば、その場で提供できる
+function canServeFromStock(){
+  const total = cartTotalSkewers();
+  if(total === 0 || total > STOCK_SERVE_MAX) return false;
+  const by = cartByFlavor();
+  return FLAVORS.every(f => (state.stock[f]||0) >= by[f]);
+}
+
+// 4本以下だが在庫が足りない状態か（＝焼き場に回す必要がある）
+function isShortOfStock(){
+  const total = cartTotalSkewers();
+  if(total === 0 || total > STOCK_SERVE_MAX) return false;
+  return !canServeFromStock();
+}
+
+async function serveFromStock(){
+  const by = cartByFlavor();
+  const items = MENU
+    .filter(m=>state.cart[m.name]>0)
+    .map(m=>({name:m.name, qty:state.cart[m.name], price:m.price, skewers:m.skewers}));
+  if(items.length===0) return;
+  const total = items.reduce((sum,i)=> sum + i.qty*i.price, 0);
+  const totalSkewers = items.reduce((sum,i)=> sum + i.qty*i.skewers, 0);
+
+  if(state.submitting) return;
+  state.submitting = true;
+  render();
+
+  try{
+    const data = await apiGetData();
+
+    // 在庫は最新を取り直して確認（他端末とのズレ防止）
+    const short = FLAVORS.find(f => (data.stock[f]||0) < by[f]);
+    if(short){
+      throw new Error(`${short}の在庫が足りません（残り${data.stock[short]||0}本）。画面を確認してください。`);
+    }
+
+    const newStock = Object.assign({}, data.stock);
+    FLAVORS.forEach(f=>{ newStock[f] = (newStock[f]||0) - by[f]; });
+
+    const now = Date.now();
+    const newOrder = {
+      id: 'o' + now + Math.random().toString(36).slice(2,7),
+      number: state.orderNumber.trim() || '直売',
+      items,
+      total,
+      totalSkewers,
+      status: 'served',
+      fromStock: true,     // 在庫からその場で渡した注文
+      createdAt: now,
+    };
+
+    // 在庫提供は待ち時間ゼロなので、予測用のログには入れない（予測が狂うため）
+    await apiSaveData({
+      orders: [...data.orders, newOrder],
+      log: data.log,
+      stock: newStock,
+      restock: data.restock,
+    });
+
+    state.cart = {};
+    state.orderNumber = '';
+    state.submitting = false;
+    await fetchOrders();
+  }catch(err){
+    state.submitting = false;
+    console.error('在庫提供エラー:', err);
+    alert('在庫からの提供に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+    render();
+  }
+}
+
+// 在庫の増減（届いた分を足す／数え直しの修正）
+async function adjustStock(flavor, delta){
+  try{
+    const data = await apiGetData();
+    const newStock = Object.assign({}, data.stock);
+    newStock[flavor] = Math.max(0, (newStock[flavor]||0) + delta);
+    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: data.restock });
+    await fetchOrders();
+  }catch(err){
+    console.error('在庫更新エラー:', err);
+    alert('在庫の更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+// 受付 → 焼き場へ「この味を焼いて持ってきて」と依頼する
+async function requestRestock(flavor){
+  try{
+    const data = await apiGetData();
+    const newRestock = Object.assign({}, data.restock);
+    newRestock[flavor] = { status: 'requested', at: Date.now() };
+    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
+    await fetchOrders();
+  }catch(err){
+    console.error('補充依頼エラー:', err);
+    alert('補充依頼に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+// 焼き場 → 「焼けたので今から運ぶ」
+async function setRestockStatus(flavor, status){
+  try{
+    const data = await apiGetData();
+    const newRestock = Object.assign({}, data.restock);
+    newRestock[flavor] = newRestock[flavor]
+      ? Object.assign({}, newRestock[flavor], { status })
+      : { status, at: Date.now() };
+    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
+    await fetchOrders();
+  }catch(err){
+    console.error('補充状態の更新エラー:', err);
+    alert('更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+// 受付 → 届いた本数を入れて在庫に反映し、依頼を完了にする
+async function receiveRestock(flavor){
+  const input = prompt(`${flavor} は何本届きましたか？`, '');
+  if(input === null) return;
+  const n = parseInt(input, 10);
+  if(isNaN(n) || n < 0){ alert('数字を入力してください。'); return; }
+  try{
+    const data = await apiGetData();
+    const newStock = Object.assign({}, data.stock);
+    newStock[flavor] = (newStock[flavor]||0) + n;
+    const newRestock = Object.assign({}, data.restock);
+    newRestock[flavor] = null;
+    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: newRestock });
+    await fetchOrders();
+  }catch(err){
+    console.error('補充受け取りエラー:', err);
+    alert('受け取りの記録に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+async function cancelRestock(flavor){
+  if(!confirm(`${flavor} の補充依頼を取り消しますか？`)) return;
+  try{
+    const data = await apiGetData();
+    const newRestock = Object.assign({}, data.restock);
+    newRestock[flavor] = null;
+    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
+    await fetchOrders();
+  }catch(err){
+    console.error('補充取り消しエラー:', err);
+    alert('取り消しに失敗しました。');
+  }
 }
 
 function renderArrivalBanner(readyOrders){
@@ -408,7 +672,7 @@ function renderArrivalBanner(readyOrders){
     ])
   ]);
   readyOrders.forEach(o=>{
-    const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
+    const items = o.items.map(i=>`${i.name}×${i.qty}`).join('　');
     banner.appendChild(el('div', {class:'arrival-row'}, [
       el('div', {class:'arrival-left'}, [
         el('div', {class:'arrival-num'}, [
@@ -426,6 +690,62 @@ function renderArrivalBanner(readyOrders){
   return banner;
 }
 
+function renderRestockArrivalBanner(flavors){
+  const banner = el('div', {class:'arrival-banner restock-arrival'}, [
+    el('div', {class:'arrival-head'}, [
+      el('span', {class:'arrival-pulse'}, '📦'),
+      el('span', {}, '補充が届きます')
+    ])
+  ]);
+  flavors.forEach(f=>{
+    banner.appendChild(el('div', {class:'arrival-row'}, [
+      el('div', {class:'arrival-left'}, [
+        el('div', {class:'arrival-num'}, [
+          el('span', {class:'arrival-num-value restock-name'}, f)
+        ]),
+        el('div', {class:'arrival-items'}, '焼き場が運んでいます')
+      ]),
+      el('button', {class:'arrival-btn', onClick:()=>receiveRestock(f)}, [
+        el('div', {}, '受け取って'),
+        el('div', {}, '本数を入力')
+      ])
+    ]));
+  });
+  return banner;
+}
+
+function renderStockPanel(){
+  const panel = el('div', {class:'stock-panel'});
+  panel.appendChild(el('div', {class:'stock-head'}, `受付の在庫（${STOCK_SERVE_MAX}本以下はここから提供）`));
+  const grid = el('div', {class:'stock-grid'});
+  FLAVORS.forEach(f=>{
+    const n = state.stock[f] || 0;
+    const req = state.restock[f];
+    const box = el('div', {class:'stock-item' + (n===0 ? ' is-zero' : (n<=2 ? ' is-low' : ''))}, [
+      el('div', {class:'stock-name'}, f),
+      el('div', {class:'stock-count'}, [
+        el('span', {class:'stock-num'}, String(n)),
+        el('span', {class:'stock-unit'}, '本')
+      ]),
+      el('div', {class:'stock-steps'}, [
+        el('button', {onClick:()=>adjustStock(f,-1)}, '−'),
+        el('button', {onClick:()=>adjustStock(f,1)}, '＋'),
+      ]),
+    ]);
+    if(!req){
+      box.appendChild(el('button', {class:'stock-req-btn', onClick:()=>requestRestock(f)}, '焼き場に補充を依頼'));
+    } else if(req.status === 'requested'){
+      box.appendChild(el('div', {class:'stock-req-state'}, '⏳ 依頼中…'));
+      box.appendChild(el('button', {class:'stock-cancel-btn', onClick:()=>cancelRestock(f)}, '依頼を取り消す'));
+    } else {
+      box.appendChild(el('div', {class:'stock-req-state is-coming'}, '🚶 運搬中'));
+    }
+    grid.appendChild(box);
+  });
+  panel.appendChild(grid);
+  return panel;
+}
+
 // ---------- order taking screen ----------
 function renderOrderScreen(){
   const screen = el('div', {class:'screen'});
@@ -434,10 +754,16 @@ function renderOrderScreen(){
   const readyOrders = activeOrders.filter(o=>o.status==='ready');
   const cookingOrders = activeOrders.filter(o=>o.status!=='ready');
   const servedOrders = state.orders.filter(o=>o.status==='served').sort((a,b)=>b.createdAt-a.createdAt);
+  const deliveringFlavors = FLAVORS.filter(f=>state.restock[f] && state.restock[f].status==='delivering');
 
   if(readyOrders.length){
     screen.appendChild(renderArrivalBanner(readyOrders));
   }
+  if(deliveringFlavors.length){
+    screen.appendChild(renderRestockArrivalBanner(deliveringFlavors));
+  }
+
+  screen.appendChild(renderStockPanel());
 
   screen.appendChild(el('div', {class:'section-label'}, '注文番号'));
   const dupe = state.orderNumber.trim() !== '' &&
@@ -449,8 +775,6 @@ function renderOrderScreen(){
     placeholder:'例: 12',
     value: state.orderNumber,
     onInput:(e)=>{ state.orderNumber = e.target.value; updateNumberUi(); },
-    onFocus:()=>{ state.isTyping = true; },   // ★フォーカスが当たったら入力中
-    onBlur:()=>{ state.isTyping = false; },   // ★フォーカスが外れたら入力終了
   });
   screen.appendChild(numInput);
   screen.appendChild(el('div', {class:'num-warn' + (dupe ? '' : ' is-hidden')},
@@ -473,11 +797,23 @@ function renderOrderScreen(){
   });
   screen.appendChild(grid);
 
-  const cartSkewers = MENU.reduce((sum,m)=> sum + (state.cart[m.name]||0)*m.skewers, 0);
-  const activeSkewersForWait = pendingSkewersInOrders(['new','grilling','ready']);
-  screen.appendChild(renderWaitEstimate(activeSkewersForWait + cartSkewers, {
-    label: cartSkewers > 0 ? 'この注文の予想待ち時間: ' : '現在の予想待ち時間: '
-  }));
+  const cartSkewers = cartTotalSkewers();
+  const stockOk = canServeFromStock();
+  if(stockOk){
+    screen.appendChild(el('div', {class:'stock-ready-note'}, [
+      el('div', {class:'stock-ready-main'}, '✅ 在庫からすぐ提供できます'),
+      el('div', {class:'stock-ready-sub'}, `${cartSkewers}本（${STOCK_SERVE_MAX}本以下）— 焼き場には送りません`)
+    ]));
+  } else {
+    const activeSkewersForWait = pendingSkewersInOrders(['new','grilling','ready']);
+    screen.appendChild(renderWaitEstimate(activeSkewersForWait + cartSkewers, {
+      label: cartSkewers > 0 ? 'この注文の予想待ち時間: ' : '現在の予想待ち時間: '
+    }));
+    if(isShortOfStock()){
+      screen.appendChild(el('div', {class:'stock-short-note'},
+        `⚠ ${STOCK_SERVE_MAX}本以下ですが在庫が足りないので、焼き場に送ります`));
+    }
+  }
 
   screen.appendChild(el('div', {class:'section-label'}, '調理中の注文'));
   if(cookingOrders.length===0){
@@ -504,15 +840,19 @@ function renderOrderScreen(){
     el('div', {class:'cart-info'}, [
       numReady
         ? el('div', {class:'cart-num'}, 'No.' + state.orderNumber.trim())
-        : el('div', {class:'cart-num is-empty'}, '番号を入力'),
+        : el('div', {class:'cart-num' + (stockOk ? ' is-optional' : ' is-empty')}, stockOk ? '番号なしでOK' : '番号を入力'),
       el('div', {}, [
         document.createTextNode('選択中: '),
         el('b', {}, String(cartCount) + '点'),
-        document.createTextNode(' 合計 '),
+        document.createTextNode('　合計 '),
         el('b', {}, cartTotal.toLocaleString() + '円')
       ])
     ]),
-    el('button', {class:'submit-btn', disabled: (cartCount===0 || !numReady || state.submitting), onClick:submitOrder}, state.submitting ? '送信中…' : '注文を送信')
+    stockOk
+      ? el('button', {class:'submit-btn stock-btn', disabled: state.submitting, onClick:serveFromStock},
+          state.submitting ? '処理中…' : '在庫から提供')
+      : el('button', {class:'submit-btn', disabled: (cartCount===0 || !numReady || state.submitting), onClick:submitOrder},
+          state.submitting ? '送信中…' : '注文を送信')
   ]);
 
   const wrap = el('div', {});
@@ -522,7 +862,7 @@ function renderOrderScreen(){
 }
 
 function renderOrderSideTicket(o){
-  const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
+  const items = o.items.map(i=>`${i.name}×${i.qty}`).join('　');
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
@@ -597,9 +937,34 @@ async function submitOrder(){
 }
 
 // ---------- grill screen ----------
+function renderRestockCard(flavor, req){
+  const card = el('div', {class:'restock-card' + (req.status==='delivering' ? ' is-delivering' : '')}, [
+    el('div', {class:'restock-top'}, [
+      el('div', {class:'restock-title'}, [
+        el('span', {class:'restock-icon'}, '📦'),
+        el('span', {}, flavor + ' の補充依頼')
+      ]),
+      el('div', {class:'ticket-time'}, elapsed(req.at))
+    ]),
+    el('div', {class:'restock-note'}, req.status==='delivering'
+      ? '運搬中 — 受付が本数を入力すると完了します'
+      : '受付の在庫が切れています。焼けた分を室内へ運んでください（本数は問いません）')
+  ]);
+  if(req.status === 'requested'){
+    card.appendChild(el('button', {class:'ticket-action restock-action', onClick:()=>setRestockStatus(flavor,'delivering')}, '焼けた・今から運ぶ'));
+  }
+  return card;
+}
+
 function renderGrillScreen(){
   const screen = el('div', {class:'screen'});
   const activeOrders = state.orders.filter(o=>o.status==='new' || o.status==='grilling').sort((a,b)=>a.createdAt-b.createdAt);
+  const restockFlavors = FLAVORS.filter(f=>state.restock[f]);
+
+  if(restockFlavors.length){
+    screen.appendChild(el('div', {class:'section-label'}, '📦 受付から補充依頼'));
+    restockFlavors.forEach(f=>screen.appendChild(renderRestockCard(f, state.restock[f])));
+  }
 
   const pendingSkewers = pendingSkewersInOrders(['new','grilling']);
   screen.appendChild(renderWaitEstimate(pendingSkewers, { label: '今から出す注文の目安: ' }));
@@ -614,7 +979,7 @@ function renderGrillScreen(){
 }
 
 function renderGrillTicket(o){
-  const items = o.items.map(i=>`${i.name} <span>×${i.qty}</span>`).join(' ');
+  const items = o.items.map(i=>`${i.name} <span>×${i.qty}</span>`).join('　');
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
@@ -738,7 +1103,7 @@ function elapsed(createdAt){
 render();
 fetchOrders();
 setInterval(fetchOrders, 2500);
-setInterval(()=>{ state.now = Date.now(); if(state.role && !state.isTyping) render(); }, 1000); // ★ !state.isTyping の条件を追加
+setInterval(()=>{ state.now = Date.now(); if(state.role) render(); }, 1000);
 </script>
 </body>
 </html>
