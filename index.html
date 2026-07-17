@@ -211,6 +211,7 @@ let state = {
   now: Date.now(),
   showHistory: false,
   soundOn: true,
+  isTyping: false,   // ★フォーカス状態（入力中）を管理するフラグを追加
 };
 let knownIds = new Set();
 let firstLoad = true;
@@ -328,7 +329,7 @@ async function fetchOrders(){
     // 取得失敗時は直前の表示をそのまま維持する（空にして注文を消さない）
   }
   state.now = Date.now();
-  render();
+  if(!state.isTyping) render(); // ★入力中(isTypingがtrue)ならrenderをスキップする
 }
 
 async function saveOrders(orders){
@@ -407,7 +408,7 @@ function renderArrivalBanner(readyOrders){
     ])
   ]);
   readyOrders.forEach(o=>{
-    const items = o.items.map(i=>`${i.name}×${i.qty}`).join('　');
+    const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
     banner.appendChild(el('div', {class:'arrival-row'}, [
       el('div', {class:'arrival-left'}, [
         el('div', {class:'arrival-num'}, [
@@ -448,6 +449,8 @@ function renderOrderScreen(){
     placeholder:'例: 12',
     value: state.orderNumber,
     onInput:(e)=>{ state.orderNumber = e.target.value; updateNumberUi(); },
+    onFocus:()=>{ state.isTyping = true; },   // ★フォーカスが当たったら入力中
+    onBlur:()=>{ state.isTyping = false; },   // ★フォーカスが外れたら入力終了
   });
   screen.appendChild(numInput);
   screen.appendChild(el('div', {class:'num-warn' + (dupe ? '' : ' is-hidden')},
@@ -505,7 +508,7 @@ function renderOrderScreen(){
       el('div', {}, [
         document.createTextNode('選択中: '),
         el('b', {}, String(cartCount) + '点'),
-        document.createTextNode('　合計 '),
+        document.createTextNode(' 合計 '),
         el('b', {}, cartTotal.toLocaleString() + '円')
       ])
     ]),
@@ -519,7 +522,7 @@ function renderOrderScreen(){
 }
 
 function renderOrderSideTicket(o){
-  const items = o.items.map(i=>`${i.name}×${i.qty}`).join('　');
+  const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
@@ -611,7 +614,7 @@ function renderGrillScreen(){
 }
 
 function renderGrillTicket(o){
-  const items = o.items.map(i=>`${i.name} <span>×${i.qty}</span>`).join('　');
+  const items = o.items.map(i=>`${i.name} <span>×${i.qty}</span>`).join(' ');
   const t = el('div', {class:'ticket status-'+o.status}, [
     el('div', {class:'ticket-top'}, [
       el('div', {class:'ticket-num'}, String(o.number)),
@@ -735,7 +738,7 @@ function elapsed(createdAt){
 render();
 fetchOrders();
 setInterval(fetchOrders, 2500);
-setInterval(()=>{ state.now = Date.now(); if(state.role) render(); }, 1000);
+setInterval(()=>{ state.now = Date.now(); if(state.role && !state.isTyping) render(); }, 1000); // ★ !state.isTyping の条件を追加
 </script>
 </body>
 </html>
