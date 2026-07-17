@@ -281,7 +281,7 @@ let state = {
   log: [],           // 提供完了ごとの {skewers, waitSeconds, servedAt} 記録
   stock: {},         // 受付の在庫 {塩コショウ: n, タレ: n}
   stockEditing: {},  // 在庫を手入力中の味 → 入力中の文字列をそのまま保持する
-  restock: {},       // 補充依頼 {塩コショウ: null|{status,at}, タレ: ...}
+  restock: {},       // 補充依頼 {塩コショウ: null|{status,at,count}, タレ: ...}
   cart: {},
   orderNumber: '',   // 受付で手入力する注文番号（整理券の番号など）
   now: Date.now(),
@@ -290,7 +290,7 @@ let state = {
 };
 let knownIds = new Set();
 let firstLoad = true;
-let activeStockSaves = 0; // 追加：在庫を保存している最中かを判定するフラグ
+let activeStockSaves = 0; // 在庫を保存している最中かを判定するフラグ
 
 // ユーザーがテキスト入力中の状態かを判定するヘルパー
 function isUserTyping() {
@@ -431,7 +431,7 @@ async function fetchOrders(){
     const data = await apiGetData();
     checkForAlerts(data);
 
-    // 追加：保存中の場合はサーバーの古い在庫データで画面を上書きして巻き戻るのを防ぐ
+    // 保存中の場合はサーバーの古い在庫データで画面を上書きして巻き戻るのを防ぐ
     let stockToApply = data.stock;
     if (activeStockSaves > 0) {
       stockToApply = state.stock;
@@ -639,7 +639,7 @@ async function serveFromStock(){
   }
 }
 
-// 追加：操作した数値を即座に画面に反映しつつ、裏でサーバーへ保存する統合関数
+// 操作した数値を即座に画面に反映しつつ、裏でサーバーへ保存する統合関数
 async function saveStockToServer(flavor, newVal) {
   // ① 即座にローカルの状態を更新し、もっさり感やカクつきをなくす（オプティミスティックUI）
   state.stock[flavor] = newVal;
@@ -685,37 +685,47 @@ async function requestRestock(flavor){
   }
 }
 
-async function setRestockStatus(flavor, status){
+// 焼き場側：補充の本数を入力して運搬状態にする
+async function sendRestockFromGrill(flavor){
+  const input = prompt(`${flavor} を何本運びますか？`, '10');
+  if(input === null) return;
+  const n = parseInt(input, 10);
+  if(isNaN(n) || n <= 0){ alert('1以上の数字を入力してください。'); return; }
+
   try{
     const data = await apiGetData();
     const newRestock = Object.assign({}, data.restock);
-    newRestock[flavor] = newRestock[flavor]
-      ? Object.assign({}, newRestock[flavor], { status })
-      : { status, at: Date.now() };
+    newRestock[flavor] = { status: 'delivering', at: Date.now(), count: n };
     await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
     await fetchOrders();
   }catch(err){
-    console.error('補充状態の更新エラー:', err);
-    alert('更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+    console.error('補充運搬開始エラー:', err);
+    alert('送信に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
   }
 }
 
-async function receiveRestock(flavor){
-  const input = prompt(`${flavor} は何本届きましたか？`, '');
-  if(input === null) return;
-  const n = parseInt(input, 10);
-  if(isNaN(n) || n < 0){ alert('数字を入力してください。'); return; }
+// 受付側：運ばれてきた補充をワンタップで受け取って在庫を増やす
+async function completeRestockAtReception(flavor){
+  const req = state.restock[flavor];
+  if(!req) return;
+  const n = req.count || 0;
+
   try{
     const data = await apiGetData();
+    const currentReq = data.restock[flavor];
+    const addCount = currentReq ? (currentReq.count || 0) : n;
+
     const newStock = Object.assign({}, data.stock);
-    newStock[flavor] = (newStock[flavor]||0) + n;
+    newStock[flavor] = (newStock[flavor]||0) + addCount;
+
     const newRestock = Object.assign({}, data.restock);
     newRestock[flavor] = null;
+
     await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: newRestock });
     await fetchOrders();
   }catch(err){
-    console.error('補充受け取りエラー:', err);
-    alert('受け取りの記録に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
+    console.error('補充受け取り完了エラー:', err);
+    alert('受け取り完了処理に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
   }
 }
 
@@ -767,16 +777,18 @@ function renderRestockArrivalBanner(flavors){
     ])
   ]);
   flavors.forEach(f=>{
+    const req = state.restock[f];
+    const count = req ? (req.count || 0) : 0;
     banner.appendChild(el('div', {class:'arrival-row'}, [
       el('div', {class:'arrival-left'}, [
         el('div', {class:'arrival-num'}, [
-          el('span', {class:'arrival-num-value restock-name'}, f)
+          el('span', {class:'arrival-num-value restock-name'}, `${f} × ${count}本`)
         ]),
-        el('div', {class:'arrival-items'}, '焼き場が運んでいます')
+        el('div', {class:'arrival-items'}, '焼き場が運んできました')
       ]),
-      el('button', {class:'arrival-btn', onClick:()=>receiveRestock(f)}, [
-        el('div', {}, '受け取って'),
-        el('div', {}, '本数を入力')
+      el('button', {class:'arrival-btn', onClick:()=>completeRestockAtReception(f)}, [
+        el('div', {}, '受け取り完了'),
+        el('div', {class:'arrival-btn-sub'}, `＋${count}本を加算`)
       ])
     ]));
   });
@@ -1019,7 +1031,8 @@ async function submitOrder(){
 
 // ---------- grill screen ----------
 function renderRestockCard(flavor, req){
-  const card = el('div', {class:'restock-card' + (req.status==='delivering' ? ' is-delivering' : '')}, [
+  const isDelivering = req.status==='delivering';
+  const card = el('div', {class:'restock-card' + (isDelivering ? ' is-delivering' : '')}, [
     el('div', {class:'restock-top'}, [
       el('div', {class:'restock-title'}, [
         el('span', {class:'restock-icon'}, '📦'),
@@ -1028,12 +1041,12 @@ function renderRestockCard(flavor, req){
       // 経過時間の自動更新用データ属性を付与
       el('div', {class:'ticket-time', 'data-created-at': req.at}, elapsed(req.at))
     ]),
-    el('div', {class:'restock-note'}, req.status==='delivering'
-      ? '運搬中 — 受付が本数を入力すると完了します'
-      : '受付の在庫が切れています。焼けた分を室内へ運んでください（本数は問いません）')
+    el('div', {class:'restock-note'}, isDelivering
+      ? `運搬中（${req.count || 0}本） — 受付の受け取りボタン待ちです`
+      : '受付の在庫が切れています。焼けた分を室内へ運んでください。')
   ]);
   if(req.status === 'requested'){
-    card.appendChild(el('button', {class:'ticket-action restock-action', onClick:()=>setRestockStatus(flavor,'delivering')}, '焼けた・今から運ぶ'));
+    card.appendChild(el('button', {class:'ticket-action restock-action', onClick:()=>sendRestockFromGrill(flavor)}, '焼けた本数を入力して運ぶ'));
   }
   return card;
 }
