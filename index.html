@@ -107,6 +107,15 @@
   .ticket-sub-actions button.danger{background:rgba(217,75,75,0.18); color:#ef7c7c;}
   .empty-state{color:var(--smoke); text-align:center; padding:30px 10px; font-size:13px;}
 
+  .wait-box{background:linear-gradient(135deg,rgba(232,98,44,0.14),rgba(242,166,90,0.08));
+    border:1px solid rgba(242,166,90,0.35); border-radius:14px; padding:12px 14px; margin-bottom:14px;}
+  .wait-box.is-default{border-color:var(--line); background:rgba(255,255,255,0.03);}
+  .wait-main{display:flex; align-items:baseline; gap:4px; flex-wrap:wrap;}
+  .wait-label{font-size:13px; color:var(--cream); font-weight:700;}
+  .wait-value{font-size:18px; font-weight:900; color:var(--amber);}
+  .wait-box.is-default .wait-value{color:var(--cream);}
+  .wait-sub{font-size:11px; color:var(--smoke); margin-top:4px;}
+
   .done-banner{background:linear-gradient(135deg,var(--ready),var(--ready-2)); border-radius:16px;
     padding:14px; margin-bottom:16px; box-shadow:0 4px 18px rgba(111,174,92,0.4);}
   .done-head{display:flex; align-items:center; gap:8px; font-weight:900; font-size:14px; color:white; margin-bottom:10px;}
@@ -151,11 +160,13 @@
 // ===== 設定 =====
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMQtuPCopEBw-fkmbG5pq__OJPbJK03TmoR4aJoY93Rnb3MdoCARu5E7id7zLNmat7/exec";
 const MENU = [
-  {name:"塩コショウ", price:150},
-  {name:"タレ", price:150},
-  {name:"塩コショウ5本セット", price:700},
-  {name:"タレ5本セット", price:700},
+  {name:"塩コショウ", price:150, skewers:1},
+  {name:"タレ", price:150, skewers:1},
+  {name:"塩コショウ5本セット", price:700, skewers:5},
+  {name:"タレ5本セット", price:700, skewers:5},
 ];
+const DEFAULT_SEC_PER_SKEWER = 90; // 実績が少ないうちの仮の目安（1本あたり秒）
+const MIN_DONE_FOR_ESTIMATE = 3;   // 完了実績がこれ未満なら「仮の目安」扱い
 
 // ===== 状態 =====
 let state = {
@@ -172,6 +183,7 @@ let state = {
 let knownIds = new Set();
 let firstLoad = true;
 let pendingWrites = 0;
+let lastSnapshot = '';
 
 // ===== 通信 =====
 async function apiGet(){
@@ -197,12 +209,14 @@ async function mutate(fn){
   const prev = {orders:state.orders, seq:state.seq, log:state.log};
   const next = fn({orders:state.orders, seq:state.seq, log:state.log});
   state.orders = next.orders; state.seq = next.seq; state.log = next.log;
+  lastSnapshot = JSON.stringify(next.orders) + '|' + JSON.stringify(next.log);
   render();
   pendingWrites++;
   try{
     await apiSave({orders:next.orders, seq:next.seq, log:next.log});
   }catch(err){
     state.orders = prev.orders; state.seq = prev.seq; state.log = prev.log;
+    lastSnapshot = JSON.stringify(prev.orders) + '|' + JSON.stringify(prev.log);
     render();
     alert('保存に失敗しました。もう一度お試しください。\n\n理由: ' + (err&&err.message?err.message:String(err)));
   }finally{
@@ -211,14 +225,20 @@ async function mutate(fn){
 }
 
 async function poll(){
-  if(pendingWrites > 0) return; // 書き込み中は上書きしない
+  if(pendingWrites > 0) return;   // 書き込み中は上書きしない
+  if(state.editing) return;       // 訂正モーダルを開いている間は触らない
   try{
     const d = await apiGet();
+    const snapshot = JSON.stringify(d.orders) + '|' + JSON.stringify(d.log);
     checkAlerts(d.orders);
     state.orders = d.orders; state.seq = d.seq; state.log = d.log;
+    state.now = Date.now();
+    // 前回と内容が同じなら再描画しない（画面のチラつき防止）
+    if(snapshot !== lastSnapshot){
+      lastSnapshot = snapshot;
+      render();
+    }
   }catch(e){ console.error('取得エラー:', e); }
-  state.now = Date.now();
-  render();
 }
 
 function checkAlerts(orders){
@@ -278,6 +298,32 @@ function cartCount(cart){ return Object.values(cart).reduce((a,b)=>a+b,0); }
 function cartTotal(cart){ return MENU.reduce((s,m)=>s+(cart[m.name]||0)*m.price,0); }
 function elapsed(ts){ const s=Math.max(0,Math.floor((state.now-ts)/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} 経過`; }
 function timeStr(ts){ const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+
+// 注文の串本数
+function orderSkewers(o){
+  return o.items.reduce((s,i)=>{
+    const m = MENU.find(x=>x.name===i.name);
+    return s + i.qty * (m ? m.skewers : 1);
+  }, 0);
+}
+// 完了実績から「1本あたり平均秒」を算出（なければnull）
+function avgSecPerSkewer(){
+  const done = state.orders.filter(o=>o.status==='done' && o.doneAt!=null && o.createdAt!=null);
+  if(done.length < MIN_DONE_FOR_ESTIMATE) return null;
+  let totalSec=0, totalSkewers=0;
+  done.forEach(o=>{ totalSec += (o.doneAt-o.createdAt)/1000; totalSkewers += orderSkewers(o); });
+  if(totalSkewers===0) return null;
+  return totalSec/totalSkewers;
+}
+// 未完了の全注文の合計串本数
+function pendingSkewers(){
+  return state.orders.filter(o=>o.status==='new').reduce((s,o)=>s+orderSkewers(o),0);
+}
+function formatWait(sec){
+  if(sec < 30) return 'まもなく';
+  if(sec < 60) return '1分未満';
+  return `約${Math.round(sec/60)}分`;
+}
 
 // ===== 操作 =====
 async function submitOrder(){
@@ -448,6 +494,9 @@ function orderScreen(){
   });
   screen.appendChild(grid);
 
+  // 待ち時間予測（今から注文するお客さんの目安）
+  screen.appendChild(waitEstimateBox('今から注文の場合の目安: ', pendingSkewers()));
+
   // 調理中の注文（訂正・取消できる）
   screen.appendChild(el('div',{class:'section-label'},`調理中の注文（${cooking.length}件）`));
   if(cooking.length===0){
@@ -457,7 +506,7 @@ function orderScreen(){
       screen.appendChild(el('div',{class:'ticket status-new'},[
         el('div',{class:'ticket-top'},[
           el('div',{class:'ticket-num'},String(o.number)),
-          el('div',{class:'ticket-time'}, elapsed(o.createdAt)),
+          el('div',{class:'ticket-time', 'data-elapsed':String(o.createdAt)}, elapsed(o.createdAt)),
         ]),
         el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
         el('div',{class:'ticket-sub-actions'},[
@@ -521,6 +570,9 @@ function updateNumberUi(){
 function grillScreen(){
   const screen = el('div',{class:'screen'});
   const cooking = state.orders.filter(o=>o.status==='new').sort((a,b)=>a.createdAt-b.createdAt);
+
+  screen.appendChild(waitEstimateBox('今抱えている注文の消化目安: ', pendingSkewers()));
+
   screen.appendChild(el('div',{class:'section-label'},`焼く注文（${cooking.length}件）`));
   if(cooking.length===0){
     screen.appendChild(el('div',{class:'empty-state'},'新しい注文はありません'));
@@ -529,7 +581,7 @@ function grillScreen(){
       screen.appendChild(el('div',{class:'ticket status-new'},[
         el('div',{class:'ticket-top'},[
           el('div',{class:'ticket-num'},String(o.number)),
-          el('div',{class:'ticket-time'}, elapsed(o.createdAt)),
+          el('div',{class:'ticket-time', 'data-elapsed':String(o.createdAt)}, elapsed(o.createdAt)),
         ]),
         el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
         el('button',{class:'ticket-action done', onClick:()=>markDone(o.id)},'焼き上がり・完了'),
@@ -537,6 +589,24 @@ function grillScreen(){
     });
   }
   return screen;
+}
+
+// 待ち時間予測ボックス
+function waitEstimateBox(label, skewers){
+  const avg = avgSecPerSkewer();
+  const usingDefault = avg===null;
+  const secPer = usingDefault ? DEFAULT_SEC_PER_SKEWER : avg;
+  const seconds = skewers * secPer;
+  return el('div',{class:'wait-box'+(usingDefault?' is-default':'')},[
+    el('div',{class:'wait-main'},[
+      el('span',{},'⏱ '),
+      el('span',{class:'wait-label'}, label),
+      el('span',{class:'wait-value'}, skewers===0 ? '待ちなし' : formatWait(seconds)),
+    ]),
+    el('div',{class:'wait-sub'}, usingDefault
+      ? `実績収集中のため仮の目安（1本${DEFAULT_SEC_PER_SKEWER}秒換算・残り${skewers}本）`
+      : `実績平均：1本あたり約${Math.round(avg)}秒（残り${skewers}本）`),
+  ]);
 }
 
 // ---- 訂正モーダル ----
@@ -583,7 +653,16 @@ function editModal(){
 render();
 poll();
 setInterval(poll, 2500);
-setInterval(()=>{ state.now=Date.now(); if(state.role) render(); }, 1000);
+
+// 1秒ごと：全体は再描画せず、経過時間の表示だけ書き換える（チラつき防止）
+setInterval(()=>{
+  state.now = Date.now();
+  if(!state.role) return;
+  document.querySelectorAll('.ticket-time[data-elapsed]').forEach(elm=>{
+    const ts = Number(elm.getAttribute('data-elapsed'));
+    if(ts) elm.textContent = elapsed(ts);
+  });
+}, 1000);
 </script>
 </body>
 </html>
