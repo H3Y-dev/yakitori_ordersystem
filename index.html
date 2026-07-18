@@ -5,1221 +5,529 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>焼き鳥注文システム</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --charcoal:#1c1815;
-    --charcoal-2:#26201c;
-    --ember:#e8622c;
-    --ember-2:#c94f20;
-    --amber:#f2a65a;
-    --cream:#f4ede4;
-    --smoke:#8a8178;
-    --ready:#6fae5c;
-    --ready-2:#5a9048;
-    --line:#3a322c;
-    --danger:#d94b4b;
+    --charcoal:#1c1815; --charcoal-2:#26201c; --ember:#e8622c; --ember-2:#c94f20;
+    --amber:#f2a65a; --cream:#f4ede4; --smoke:#8a8178; --ready:#6fae5c; --ready-2:#5a9048;
+    --line:#3a322c; --danger:#d94b4b;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-  html,body{margin:0; padding:0; background:var(--charcoal); color:var(--cream); font-family:'Zen Kaku Gothic New','Zen Maru Gothic',sans-serif; overscroll-behavior:none;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--charcoal); color:var(--cream);
+    font-family:'Zen Kaku Gothic New',sans-serif; overscroll-behavior:none;}
   #root{min-height:100vh; display:flex; flex-direction:column;}
 
-  .topbar{
-    padding:14px 16px;
-    background:linear-gradient(180deg, var(--charcoal-2), var(--charcoal));
-    border-bottom:1px solid var(--line);
-    display:flex; align-items:center; justify-content:space-between;
-    position:sticky; top:0; z-index:10;
-  }
+  .topbar{padding:14px 16px; background:linear-gradient(180deg,var(--charcoal-2),var(--charcoal));
+    border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:10;}
   .brand{display:flex; align-items:center; gap:10px;}
-  .brand .mark{
-    width:34px; height:34px; border-radius:8px;
-    background:linear-gradient(135deg, var(--ember), var(--ember-2));
-    display:flex; align-items:center; justify-content:center;
-    font-size:18px; font-weight:900; box-shadow:0 2px 8px rgba(232,98,44,0.35);
-  }
-  .brand .title{font-weight:900; font-size:16px; letter-spacing:0.02em;}
+  .brand .mark{width:34px; height:34px; border-radius:8px;
+    background:linear-gradient(135deg,var(--ember),var(--ember-2));
+    display:flex; align-items:center; justify-content:center; font-size:18px;}
+  .brand .title{font-weight:900; font-size:16px;}
   .brand .subtitle{font-size:11px; color:var(--smoke); margin-top:1px;}
-  .role-badge{
-    font-size:11px; font-weight:700; padding:5px 10px; border-radius:100px;
-    background:rgba(242,166,90,0.12); color:var(--amber); border:1px solid rgba(242,166,90,0.3);
-  }
-  .switch-btn{background:none; border:none; color:var(--smoke); font-size:11px; text-decoration:underline; cursor:pointer; padding:4px;}
+  .role-badge{font-size:11px; font-weight:700; padding:5px 10px; border-radius:100px;
+    background:rgba(242,166,90,0.12); color:var(--amber); border:1px solid rgba(242,166,90,0.3);}
+  .switch-btn{background:none; border:none; color:var(--smoke); font-size:11px;
+    text-decoration:underline; cursor:pointer; padding:4px;}
 
-  /* --- role select --- */
   .select-screen{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:28px;}
   .select-hero{text-align:center;}
   .select-hero .kanji{font-size:15px; color:var(--ember); font-weight:700; letter-spacing:0.15em; margin-bottom:6px;}
-  .select-hero h1{font-size:26px; margin:0; font-weight:900; line-height:1.4;}
+  .select-hero h1{font-size:26px; margin:0; font-weight:900;}
   .select-hero p{color:var(--smoke); font-size:13px; margin-top:8px;}
   .role-options{display:flex; flex-direction:column; gap:14px; width:100%; max-width:340px;}
-  .role-card{
-    background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:16px;
+  .role-card{background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:16px;
     padding:20px; text-align:left; cursor:pointer; color:var(--cream);
-    display:flex; align-items:center; gap:14px; transition:transform .08s, border-color .15s;
-  }
+    display:flex; align-items:center; gap:14px; transition:transform .08s;}
   .role-card:active{transform:scale(0.98);}
   .role-card.order{border-color:rgba(242,166,90,0.4);}
   .role-card.grill{border-color:rgba(232,98,44,0.4);}
-  .role-icon{font-size:28px; width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .role-icon{font-size:28px; width:48px; height:48px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;}
   .role-card.order .role-icon{background:rgba(242,166,90,0.15);}
   .role-card.grill .role-icon{background:rgba(232,98,44,0.15);}
   .role-card .role-name{font-weight:900; font-size:16px;}
   .role-card .role-desc{font-size:12px; color:var(--smoke); margin-top:3px;}
-  .reset-link{margin-top:6px; background:none; border:none; color:var(--line); font-size:11px; text-decoration:underline; cursor:pointer;}
+  .reset-link{margin-top:6px; background:none; border:none; color:var(--line);
+    font-size:11px; text-decoration:underline; cursor:pointer;}
 
-  /* --- order taking screen --- */
-  .screen{flex:1; padding:14px 14px 90px 14px; overflow-y:auto;}
+  .screen{flex:1; padding:14px 14px 120px 14px; overflow-y:auto;}
   .section-label{font-size:12px; font-weight:700; color:var(--smoke); letter-spacing:0.08em; margin:18px 4px 8px;}
   .section-label:first-child{margin-top:4px;}
 
   .menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .menu-item{
-    background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:14px;
-    padding:12px; display:flex; flex-direction:column; gap:8px;
-  }
+  .menu-item{background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:14px;
+    padding:12px; display:flex; flex-direction:column; gap:7px;}
   .menu-item .mname{font-weight:700; font-size:14px;}
-  .menu-item .mprice{font-size:12px; color:var(--amber); font-weight:700; margin-top:-4px;}
+  .menu-item .mprice{font-size:12px; color:var(--amber); font-weight:700; margin-top:-3px;}
   .stepper{display:flex; align-items:center; justify-content:space-between; background:var(--charcoal); border-radius:10px; padding:4px;}
-  .stepper button{
-    width:34px; height:34px; border-radius:8px; border:none; background:var(--line); color:var(--cream);
-    font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  }
+  .stepper button{width:38px; height:38px; border-radius:8px; border:none; background:var(--line);
+    color:var(--cream); font-size:19px; font-weight:700; cursor:pointer;}
   .stepper button.plus{background:var(--ember); color:var(--charcoal);}
-  .stepper .qty{font-size:16px; font-weight:900; min-width:24px; text-align:center;}
+  .stepper .qty{font-size:18px; font-weight:900; min-width:26px; text-align:center;}
 
-  .cart-bar{
-    position:fixed; bottom:0; left:0; right:0; max-width:600px; margin:0 auto;
+  .cart-bar{position:fixed; bottom:0; left:0; right:0; max-width:600px; margin:0 auto;
     background:var(--charcoal-2); border-top:1px solid var(--line);
     padding:12px 14px calc(12px + env(safe-area-inset-bottom));
-    display:flex; align-items:center; gap:12px; z-index:20;
-  }
+    display:flex; align-items:center; gap:12px; z-index:20;}
   .cart-info{flex:1; font-size:12px; color:var(--smoke);}
   .cart-info b{color:var(--cream); font-size:14px;}
-  .submit-btn{
-    background:linear-gradient(135deg, var(--ember), var(--ember-2)); color:white; border:none;
-    padding:13px 22px; border-radius:12px; font-weight:900; font-size:14px; cursor:pointer;
-    box-shadow:0 4px 14px rgba(232,98,44,0.35);
-  }
+  .submit-btn{background:linear-gradient(135deg,var(--ember),var(--ember-2)); color:white; border:none;
+    padding:15px 24px; border-radius:12px; font-weight:900; font-size:15px; cursor:pointer;
+    box-shadow:0 4px 14px rgba(232,98,44,0.35);}
   .submit-btn:disabled{opacity:0.35; box-shadow:none;}
 
-  /* --- ticket cards --- */
-  .ticket{
-    background:var(--charcoal-2); border-radius:14px; padding:14px; margin-bottom:10px;
-    border-left:4px solid var(--line); position:relative;
-  }
+  .ticket{background:var(--charcoal-2); border-radius:14px; padding:14px; margin-bottom:10px;
+    border-left:4px solid var(--line);}
   .ticket.status-new{border-left-color:var(--danger);}
-  .ticket.status-grilling{border-left-color:var(--amber);}
-  .ticket.status-ready{border-left-color:var(--ready);}
   .ticket-top{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px;}
-  .ticket-num{font-size:20px; font-weight:900; font-variant-numeric:tabular-nums;}
+  .ticket-num{font-size:22px; font-weight:900; font-variant-numeric:tabular-nums;}
   .ticket-num::before{content:"No."; font-size:11px; color:var(--smoke); font-weight:700; margin-right:2px;}
   .ticket-time{font-size:11px; color:var(--smoke); font-variant-numeric:tabular-nums;}
-  .ticket-items{font-size:13px; color:var(--cream); line-height:1.6;}
-  .ticket-items span{color:var(--smoke);}
-  .ticket-total{font-size:13px; font-weight:900; color:var(--amber); margin-top:6px;}
+  .ticket-items{font-size:15px; line-height:1.6;}
+  .ticket-items .qty{color:var(--amber); font-weight:900;}
+  .ticket-edited{display:inline-block; font-size:10px; font-weight:700; color:var(--amber);
+    background:rgba(242,166,90,0.15); padding:2px 7px; border-radius:100px; margin-left:6px;}
+  .ticket-action{margin-top:10px; width:100%; border:none; padding:14px; border-radius:10px;
+    font-weight:900; font-size:15px; cursor:pointer;}
+  .ticket-action.done{background:var(--ready); color:var(--charcoal);}
+  .ticket-sub-actions{display:flex; gap:8px; margin-top:8px;}
+  .ticket-sub-actions button{flex:1; border:none; padding:9px; border-radius:9px;
+    font-size:12px; font-weight:700; cursor:pointer; background:var(--line); color:var(--cream);}
+  .ticket-sub-actions button.danger{background:rgba(217,75,75,0.18); color:#ef7c7c;}
+  .empty-state{color:var(--smoke); text-align:center; padding:30px 10px; font-size:13px;}
 
-  .wait-estimate{
-    background:linear-gradient(135deg, rgba(232,98,44,0.14), rgba(242,166,90,0.08));
-    border:1px solid rgba(242,166,90,0.35); border-radius:14px;
-    padding:12px 14px; margin-bottom:14px;
-  }
-  .wait-estimate.is-default{border-color:var(--line); background:rgba(255,255,255,0.03);}
-  .wait-main{display:flex; align-items:baseline; gap:6px; flex-wrap:wrap;}
-  .wait-icon{font-size:15px;}
-  .wait-text{font-size:13px; color:var(--cream); font-weight:700;}
-  .wait-value{font-size:18px; font-weight:900; color:var(--amber);}
-  .wait-estimate.is-default .wait-value{color:var(--cream);}
-  .wait-sub{font-size:11px; color:var(--smoke); margin-top:4px;}
+  .done-banner{background:linear-gradient(135deg,var(--ready),var(--ready-2)); border-radius:16px;
+    padding:14px; margin-bottom:16px; box-shadow:0 4px 18px rgba(111,174,92,0.4);}
+  .done-head{display:flex; align-items:center; gap:8px; font-weight:900; font-size:14px; color:white; margin-bottom:10px;}
+  .done-pulse{display:inline-block; animation:pulse 1.1s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{transform:scale(1);} 50%{transform:scale(1.2);}}
+  .done-row{background:rgba(0,0,0,0.18); border-radius:12px; padding:10px 12px; margin-top:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .done-left{min-width:0;}
+  .done-num{font-size:26px; font-weight:900; color:white; line-height:1.1; font-variant-numeric:tabular-nums;}
+  .done-num::before{content:"No."; font-size:11px; opacity:0.8; margin-right:2px;}
+  .done-items{font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;}
+  .done-btn{flex-shrink:0; background:white; color:var(--ready-2); border:none; border-radius:10px;
+    padding:11px 16px; font-weight:900; font-size:13px; cursor:pointer;}
 
-  .num-input{
-    width:100%; background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:12px;
-    padding:14px; color:var(--cream); font-size:22px; font-weight:900; text-align:center;
-    font-family:inherit; font-variant-numeric:tabular-nums; letter-spacing:0.05em;
-  }
+  .modal-back{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50;
+    display:flex; align-items:flex-end; justify-content:center;}
+  .modal{background:var(--charcoal-2); width:100%; max-width:600px; border-radius:18px 18px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto;}
+  .modal-title{font-size:16px; font-weight:900; margin-bottom:4px;}
+  .modal-sub{font-size:12px; color:var(--smoke); margin-bottom:14px;}
+  .modal-actions{display:flex; gap:10px; margin-top:16px;}
+  .modal-actions button{flex:1; border:none; padding:14px; border-radius:12px; font-weight:900; font-size:14px; cursor:pointer;}
+  .modal-cancel{background:var(--line); color:var(--cream);}
+  .modal-save{background:linear-gradient(135deg,var(--ember),var(--ember-2)); color:white;}
 
-  /* --- 在庫パネル --- */
-  .stock-panel{
-    background:var(--charcoal-2); border:1px solid var(--line); border-radius:14px;
-    padding:12px; margin-bottom:14px;
-  }
-  .stock-head{font-size:11px; font-weight:700; color:var(--smoke); margin-bottom:10px; letter-spacing:0.05em;}
-  .stock-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .stock-item{
-    background:var(--charcoal); border:1.5px solid var(--line); border-radius:12px; padding:10px;
-    display:flex; flex-direction:column; gap:7px;
-  }
-  .stock-item.is-low{border-color:rgba(242,166,90,0.5);}
-  .stock-item.is-zero{border-color:var(--danger);}
-  .stock-name{font-size:12px; font-weight:700; color:var(--cream);}
-  .stock-count{display:flex; align-items:baseline; gap:2px;}
-  .stock-num-input{
-    width:64px; background:transparent; border:none; border-bottom:2px dashed var(--line);
-    color:var(--ready); font-size:26px; font-weight:900; font-family:inherit;
-    font-variant-numeric:tabular-nums; line-height:1; padding:0 0 2px 0; text-align:center;
-  }
-  .stock-num-input:focus{outline:none; border-bottom-color:var(--ember); background:rgba(255,255,255,0.06);}
-  .stock-item.is-low .stock-num-input{color:var(--amber);}
-  .stock-item.is-zero .stock-num-input{color:var(--danger);}
-  .stock-unit{font-size:11px; color:var(--smoke); font-weight:700;}
-  .stock-steps{display:flex; gap:6px;}
-  .stock-steps button{
-    flex:1; height:30px; border-radius:8px; border:none; background:var(--line); color:var(--cream);
-    font-size:15px; font-weight:900; cursor:pointer;
-  }
-  .stock-req-btn{
-    border:none; border-radius:8px; padding:8px; font-size:11px; font-weight:900; cursor:pointer;
-    background:rgba(232,98,44,0.2); color:var(--amber); border:1px solid rgba(242,166,90,0.4);
-  }
-  .stock-req-state{font-size:11px; font-weight:900; color:var(--amber); text-align:center; padding:5px;}
-  .stock-req-state.is-coming{color:var(--ready);}
-  .stock-cancel-btn{
-    background:none; border:none; color:var(--smoke); font-size:10px; text-decoration:underline; cursor:pointer; padding:2px;
-  }
-
-  .stock-ready-note{
-    background:rgba(111,174,92,0.14); border:1px solid rgba(111,174,92,0.45); border-radius:14px;
-    padding:12px 14px; margin-bottom:14px;
-  }
-  .stock-ready-main{font-size:14px; font-weight:900; color:var(--ready);}
-  .stock-ready-sub{font-size:11px; color:var(--smoke); margin-top:3px;}
-  .stock-short-note{
-    font-size:11px; color:var(--amber); background:rgba(242,166,90,0.1);
-    border:1px solid rgba(242,166,90,0.3); border-radius:10px; padding:8px 10px; margin:-8px 0 14px;
-  }
-  .cart-num.is-optional{color:var(--ready); font-size:12px; font-weight:700;}
-  .submit-btn.stock-btn{
-    background:linear-gradient(135deg, var(--ready), var(--ready-2));
-    box-shadow:0 4px 14px rgba(111,174,92,0.35);
-  }
-
-  /* --- 補充依頼カード（焼き場側） --- */
-  .restock-card{
-    background:var(--charcoal-2); border-radius:14px; padding:14px; margin-bottom:10px;
-    border-left:4px solid var(--amber);
-  }
-  .restock-card.is-delivering{border-left-color:var(--ready); opacity:0.75;}
-  .restock-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px;}
-  .restock-title{display:flex; align-items:center; gap:6px; font-size:16px; font-weight:900;}
-  .restock-icon{font-size:15px;}
-  .restock-note{font-size:12px; color:var(--smoke); line-height:1.5;}
-  .ticket-action.restock-action{background:var(--amber); color:var(--charcoal);}
-  .restock-arrival{background:linear-gradient(135deg, var(--ready), var(--ready-2)); box-shadow:0 4px 18px rgba(111,174,92,0.4);}
-  .restock-arrival .arrival-btn{color:var(--ready-2);}
-  .restock-name{font-size:20px;}
-
-  .num-input:focus{outline:none; border-color:var(--ember);}
-  .num-input.is-dupe{border-color:var(--danger);}
-  .num-warn{font-size:11px; color:#ef7c7c; margin-top:6px; text-align:center;}
-  .num-warn.is-hidden{display:none;}
-  .cart-num{font-size:15px; font-weight:900; color:var(--amber); font-variant-numeric:tabular-nums;}
-  .cart-num.is-empty{color:var(--danger); font-size:12px; font-weight:700;}
-
-  .arrival-banner{
-    background:linear-gradient(135deg, var(--ember), var(--ember-2));
-    border-radius:16px; padding:14px; margin-bottom:16px;
-    box-shadow:0 4px 18px rgba(232,98,44,0.4);
-  }
-  .arrival-head{display:flex; align-items:center; gap:8px; font-weight:900; font-size:14px; color:white; margin-bottom:10px;}
-  .arrival-pulse{display:inline-block; animation:arrival-pulse 1.1s ease-in-out infinite;}
-  @keyframes arrival-pulse{ 0%,100%{transform:scale(1);} 50%{transform:scale(1.25);} }
-  .arrival-row{
-    background:rgba(0,0,0,0.18); border-radius:12px; padding:10px 12px; margin-top:8px;
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-  }
-  .arrival-left{min-width:0;}
-  .arrival-num{display:flex; align-items:baseline; gap:2px; color:white;}
-  .arrival-num-label{font-size:12px; font-weight:700; opacity:0.8;}
-  .arrival-num-value{font-size:30px; font-weight:900; line-height:1.1; font-variant-numeric:tabular-nums;}
-  .arrival-items{font-size:12px; color:rgba(255,255,255,0.85); margin-top:2px;}
-  .arrival-btn{
-    flex-shrink:0; background:white; color:var(--ember-2); border:none; border-radius:10px;
-    padding:10px 14px; font-weight:900; font-size:12px; cursor:pointer; white-space:nowrap;
-  }
-  .arrival-btn-sub{font-size:10px; opacity:0.7; margin-top:1px; font-variant-numeric:tabular-nums;}
-  .status-pill{
-    display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:100px; margin-bottom:8px;
-  }
-  .status-pill.status-new{background:rgba(217,75,75,0.15); color:#ef7c7c;}
-  .status-pill.status-grilling{background:rgba(242,166,90,0.15); color:var(--amber);}
-  .status-pill.status-ready{background:rgba(111,174,92,0.15); color:var(--ready);}
-  .status-pill.status-served{background:rgba(138,129,120,0.15); color:var(--smoke);}
-  .ticket-action{
-    margin-top:10px; width:100%; border:none; padding:11px; border-radius:10px; font-weight:900; font-size:13px; cursor:pointer;
-  }
-  .ticket-action.grilling{background:var(--amber); color:var(--charcoal);}
-  .ticket-action.ready{background:var(--ready); color:var(--charcoal);}
-  .ticket-action.served{background:var(--cream); color:var(--charcoal);}
-  .empty-state{color:var(--line); text-align:center; padding:30px 10px; font-size:13px; color:var(--smoke);}
-
-  .history-toggle{background:none; border:1px solid var(--line); color:var(--smoke); font-size:12px; padding:8px; border-radius:10px; width:100%; cursor:pointer; margin-top:6px;}
-  .served-ticket{opacity:0.5;}
+  .history-toggle{background:none; border:1px solid var(--line); color:var(--smoke); font-size:12px;
+    padding:10px; border-radius:10px; width:100%; cursor:pointer; margin-top:8px;}
+  .log-item{font-size:12px; color:var(--smoke); padding:8px 10px; border-bottom:1px solid var(--line); line-height:1.5;}
+  .log-item .log-time{color:var(--line); font-size:10px;}
+  .log-item .log-act{font-weight:700;}
+  .log-item .log-act.create{color:var(--amber);}
+  .log-item .log-act.edit{color:var(--ember);}
+  .log-item .log-act.done{color:var(--ready);}
+  .log-item .log-act.cancel{color:var(--danger);}
 
   @media (min-width:601px){ #root{max-width:600px; margin:0 auto; border-left:1px solid var(--line); border-right:1px solid var(--line);} }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script>
+// ===== 設定 =====
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMQtuPCopEBw-fkmbG5pq__OJPbJK03TmoR4aJoY93Rnb3MdoCARu5E7id7zLNmat7/exec";
 const MENU = [
-  {name:"塩コショウ", price:150, skewers:1, flavor:"塩コショウ"},
-  {name:"タレ", price:150, skewers:1, flavor:"タレ"},
-  {name:"塩コショウ5本セット", price:700, skewers:5, flavor:"塩コショウ"},
-  {name:"タレ5本セット", price:700, skewers:5, flavor:"タレ"},
+  {name:"塩コショウ", price:150},
+  {name:"タレ", price:150},
+  {name:"塩コショウ5本セット", price:700},
+  {name:"タレ5本セット", price:700},
 ];
-const FLAVORS = ["塩コショウ", "タレ"];
-const STOCK_SERVE_MAX = 4; // この本数以下なら受付の在庫からその場で提供する
-const ORDERS_KEY = "orders-list"; // 使用していないが互換のため残置
 
-const DEFAULT_SEC_PER_SKEWER = 90; // ログが無いうちに使う仮の目安（1本あたり秒）
-const MIN_LOG_FOR_ESTIMATE = 3;    // これ未満のログ件数では「仮の目安」扱いにする
-
+// ===== 状態 =====
 let state = {
-  role: null,       // 'order' | 'grill'
-  orders: [],
-  log: [],           // 提供完了ごとの {skewers, waitSeconds, servedAt} 記録
-  stock: {},         // 受付の在庫 {塩コショウ: n, タレ: n}
-  stockEditing: {},  // 在庫を手入力中の味 → 入力中の文字列をそのまま保持する
-  restock: {},       // 補充依頼 {塩コショウ: null|{status,at,count}, タレ: ...}
+  role: null,          // 'order' | 'grill'
+  orders: [],          // {id, number, items:[{name,qty}], status:'new'|'done', createdAt, doneAt, edited}
+  seq: 0,              // 注文番号の採番用
+  log: [],             // {at, action:'create'|'edit'|'done'|'cancel', number, detail}
   cart: {},
-  orderNumber: '',   // 受付で手入力する注文番号（整理券の番号など）
   now: Date.now(),
-  showHistory: false,
-  soundOn: true,
+  showLog: false,
+  editing: null,       // 訂正中 {id, cart}
 };
 let knownIds = new Set();
 let firstLoad = true;
-let activeStockSaves = 0; // 在庫を保存している最中かを判定するフラグ
+let pendingWrites = 0;
 
-// ユーザーがテキスト入力中の状態かを判定するヘルパー
-function isUserTyping() {
-  const active = document.activeElement;
-  return active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
-}
-
-function render(){
-  const root = document.getElementById('root');
-
-  // 再描画で入力中のフォーカスが飛ばないよう、直前の状態を控えておく
-  const active = document.activeElement;
-  let focusKey = null, selStart = null, selEnd = null;
-  if(active && active.tagName === 'INPUT' && active.dataset && active.dataset.focusKey){
-    focusKey = active.dataset.focusKey;
-    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){}
-  }
-
-  root.innerHTML = '';
-  if(!state.role){
-    root.appendChild(renderRoleSelect());
-  } else if(state.role === 'order'){
-    root.appendChild(renderTopbar('注文受付'));
-    root.appendChild(renderOrderScreen());
-  } else {
-    root.appendChild(renderTopbar('焼き場'));
-    root.appendChild(renderGrillScreen());
-  }
-
-  // フォーカスとカーソル位置を戻す
-  if(focusKey){
-    const again = root.querySelector('input[data-focus-key="' + focusKey + '"]');
-    if(again){
-      again.focus({preventScroll:true});
-      if(selStart !== null){
-        try { again.setSelectionRange(selStart, selEnd); } catch(e){}
-      }
-    }
-  }
-}
-
-function el(tag, props={}, children=[]){
-  const e = document.createElement(tag);
-  Object.entries(props).forEach(([k,v])=>{
-    if(v===null || v===undefined) return; // null/undefinedは属性を付けない
-    if(k==='class') e.className=v;
-    else if(k==='html') e.innerHTML=v;
-    else if(k==='disabled') e.disabled = !!v;
-    else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
-    else e.setAttribute(k,v);
-  });
-  (Array.isArray(children)?children:[children]).forEach(c=>{
-    if(c==null) return;
-    if(typeof c === 'string') e.appendChild(document.createTextNode(c));
-    else e.appendChild(c);
-  });
-  return e;
-}
-
-function renderTopbar(label){
-  const bar = el('div', {class:'topbar'}, [
-    el('div', {class:'brand'}, [
-      el('div', {class:'mark'}, '🍢'),
-      el('div', {}, [
-        el('div', {class:'title'}, '焼き鳥注文システム'),
-        el('div', {class:'subtitle'}, '学校祭 出店管理'),
-      ])
-    ]),
-    el('div', {style:'display:flex; align-items:center; gap:8px;'}, [
-      el('div', {class:'role-badge'}, label),
-      el('button', {class:'switch-btn', onClick:()=>{state.role=null; render();}}, '役割を変更')
-    ])
-  ]);
-  return bar;
-}
-
-function renderRoleSelect(){
-  return el('div', {class:'select-screen'}, [
-    el('div', {class:'select-hero'}, [
-      el('div', {class:'kanji'}, '祭 · 焼 · 提'),
-      el('h1', {}, '焼き鳥注文システム'),
-      el('p', {}, 'このスマホの役割を選んでください')
-    ]),
-    el('div', {class:'role-options'}, [
-      el('div', {class:'role-card order', onClick:()=>{state.role='order'; render();}}, [
-        el('div', {class:'role-icon'}, '📋'),
-        el('div', {}, [
-          el('div', {class:'role-name'}, '注文受付'),
-          el('div', {class:'role-desc'}, '屋内でお客さんの注文を取る')
-        ])
-      ]),
-      el('div', {class:'role-card grill', onClick:()=>{state.role='grill'; render();}}, [
-        el('div', {class:'role-icon'}, '🔥'),
-        el('div', {}, [
-          el('div', {class:'role-name'}, '焼き場'),
-          el('div', {class:'role-desc'}, 'テントで注文を確認して焼く')
-        ])
-      ])
-    ]),
-    el('button', {class:'reset-link', onClick:resetAllData}, '（本番前テスト用）全注文データを削除')
-  ]);
-}
-
-// ---------- storage (Google Apps Script 経由) ----------
-// ここに、Apps Scriptを「ウェブアプリ」としてデプロイした時に発行されたURLを貼ってください。
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMQtuPCopEBw-fkmbG5pq__OJPbJK03TmoR4aJoY93Rnb3MdoCARu5E7id7zLNmat7/exec";
-
-function emptyStock(){ const s={}; FLAVORS.forEach(f=>s[f]=0); return s; }
-function emptyRestock(){ const r={}; FLAVORS.forEach(f=>r[f]=null); return r; }
-
-async function apiGetData(){
-  const res = await fetch(APPS_SCRIPT_URL, { method: 'GET' });
+// ===== 通信 =====
+async function apiGet(){
+  const res = await fetch(APPS_SCRIPT_URL, {method:'GET'});
   if(!res.ok) throw new Error('サーバーエラー: ' + res.status);
-  const data = await res.json();
-  if(Array.isArray(data)) return { orders: data, log: [], stock: emptyStock(), restock: emptyRestock() };
-  return {
-    orders: data.orders || [],
-    log: data.log || [],
-    stock: Object.assign(emptyStock(), data.stock || {}),
-    restock: Object.assign(emptyRestock(), data.restock || {}),
-  };
+  const d = await res.json();
+  if(Array.isArray(d)) return {orders:[], seq:0, log:[]}; // 旧形式は無視して初期化
+  return {orders:d.orders||[], seq:d.seq||0, log:d.log||[]};
 }
-
-async function apiSaveData(data){
+async function apiSave(data){
   const res = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify(data),
   });
   if(!res.ok) throw new Error('サーバーエラー: ' + res.status);
-  const result = await res.json();
-  if(!result || result.ok !== true) throw new Error('保存に失敗しました');
-  return result;
+  const r = await res.json();
+  if(!r || r.ok !== true) throw new Error('保存に失敗しました');
+  return r;
 }
 
-async function fetchOrders(){
+// 押した瞬間に画面へ反映し、保存は裏で行う（失敗時のみ元に戻す）
+async function mutate(fn){
+  const prev = {orders:state.orders, seq:state.seq, log:state.log};
+  const next = fn({orders:state.orders, seq:state.seq, log:state.log});
+  state.orders = next.orders; state.seq = next.seq; state.log = next.log;
+  render();
+  pendingWrites++;
   try{
-    const data = await apiGetData();
-    checkForAlerts(data);
-
-    // 保存中の場合はサーバーの古い在庫データで画面を上書きして巻き戻るのを防ぐ
-    let stockToApply = data.stock;
-    if (activeStockSaves > 0) {
-      stockToApply = state.stock;
-    }
-
-    // バックグラウンドデータの比較（変更があったときだけ画面を再更新する）
-    const hasChanged = JSON.stringify({
-      orders: state.orders,
-      log: state.log,
-      stock: state.stock,
-      restock: state.restock
-    }) !== JSON.stringify({
-      orders: data.orders,
-      log: data.log,
-      stock: stockToApply,
-      restock: data.restock
-    });
-
-    if (hasChanged) {
-      state.orders = data.orders;
-      state.log = data.log;
-      state.stock = stockToApply;
-      state.restock = data.restock;
-
-      // ユーザーがタイピング・入力中でない場合のみ再描画を実行
-      if (!isUserTyping()) {
-        state.now = Date.now();
-        render();
-      }
-    }
-  }catch(e){
-    console.error('注文取得エラー:', e);
+    await apiSave({orders:next.orders, seq:next.seq, log:next.log});
+  }catch(err){
+    state.orders = prev.orders; state.seq = prev.seq; state.log = prev.log;
+    render();
+    alert('保存に失敗しました。もう一度お試しください。\n\n理由: ' + (err&&err.message?err.message:String(err)));
+  }finally{
+    pendingWrites--;
   }
+}
+
+async function poll(){
+  if(pendingWrites > 0) return; // 書き込み中は上書きしない
+  try{
+    const d = await apiGet();
+    checkAlerts(d.orders);
+    state.orders = d.orders; state.seq = d.seq; state.log = d.log;
+  }catch(e){ console.error('取得エラー:', e); }
   state.now = Date.now();
-  updateElapsedTimes(); // 全画面更新せず時間表示のテキストノードのみ更新（軽量）
+  render();
 }
 
-async function resetAllData(){
-  if(!confirm('全ての注文データを削除します。よろしいですか？')) return;
-  const alsoLog = confirm('待ち時間の予測に使うログ（本数・所要時間の記録）も一緒に削除しますか？\n\nOK＝ログも削除 / キャンセル＝注文だけ削除してログは残す');
-  await apiSaveData({
-    orders: [],
-    log: alsoLog ? [] : state.log,
-    stock: emptyStock(),
-    restock: emptyRestock(),
-  });
-  knownIds = new Set();
-  await fetchOrders();
-}
-
-function checkForAlerts(data){
-  const orders = data.orders;
-  const restock = data.restock || {};
+function checkAlerts(orders){
   if(firstLoad){
-    orders.forEach(o=>knownIds.add(o.id + ':' + o.status));
-    FLAVORS.forEach(f=>{ if(restock[f]) knownIds.add('rs:'+f+':'+restock[f].status); });
-    firstLoad = false;
-    return;
+    orders.forEach(o=>knownIds.add(o.id+':'+o.status));
+    firstLoad = false; return;
   }
   orders.forEach(o=>{
-    const key = o.id + ':' + o.status;
+    const key = o.id+':'+o.status;
     if(!knownIds.has(key)){
       knownIds.add(key);
-      if(state.role==='grill' && o.status==='new') beep();
-      if(state.role==='order' && o.status==='ready') beep();
-    }
-  });
-  FLAVORS.forEach(f=>{
-    if(!restock[f]) return;
-    const key = 'rs:'+f+':'+restock[f].status;
-    if(!knownIds.has(key)){
-      knownIds.add(key);
-      if(state.role==='grill' && restock[f].status==='requested') beep();
-      if(state.role==='order' && restock[f].status==='delivering') beep();
+      if(state.role==='grill' && o.status==='new') beep();     // 焼き台：新規注文
+      if(state.role==='order' && o.status==='done') beep();    // 注文側：完了通知
     }
   });
 }
 
 function beep(){
-  if(!state.soundOn) return;
   try{
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sine'; osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.start(); osc.stop(ctx.currentTime + 0.4);
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.type='sine'; osc.frequency.value=880;
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.4);
+    osc.start(); osc.stop(ctx.currentTime+0.4);
   }catch(e){}
-  try{
-    if(navigator.vibrate) navigator.vibrate([120,80,120]);
-  }catch(e){}
+  try{ if(navigator.vibrate) navigator.vibrate([120,80,120]); }catch(e){}
 }
 
-// 繰り返しの通知
+// 未お渡しの完了注文が残る間は繰り返し鳴らす（注文側の聞き逃し防止）
 setInterval(()=>{
-  if(state.role === 'order'){
-    const hasReady = state.orders.some(o=>o.status==='ready');
-    const hasDelivering = FLAVORS.some(f=>state.restock[f] && state.restock[f].status==='delivering');
-    if(hasReady || hasDelivering) beep();
-  }
-  if(state.role === 'grill'){
-    const hasRequest = FLAVORS.some(f=>state.restock[f] && state.restock[f].status==='requested');
-    if(hasRequest) beep();
-  }
+  if(state.role==='order' && state.orders.some(o=>o.status==='done')) beep();
 }, 9000);
 
-// 番号入力中、関係する部分だけ更新する
-function updateNumberUi(){
-  const num = state.orderNumber.trim();
-  const dupe = num !== '' && state.orders.some(o=>o.status!=='served' && String(o.number)===num);
-
-  const input = document.querySelector('.num-input');
-  if(input) input.classList.toggle('is-dupe', dupe);
-
-  const warn = document.querySelector('.num-warn');
-  if(warn) warn.classList.toggle('is-hidden', !dupe);
-
-  const cartCount = Object.values(state.cart).reduce((a,b)=>a+b,0);
-  const btn = document.querySelector('.submit-btn');
-  if(btn){
-    btn.disabled = canServeFromStock()
-      ? state.submitting
-      : (cartCount===0 || num==='' || state.submitting);
-  }
+// ===== ヘルパ =====
+function el(tag, props={}, children=[]){
+  const e = document.createElement(tag);
+  Object.entries(props).forEach(([k,v])=>{
+    if(v===null||v===undefined) return;
+    if(k==='class') e.className=v;
+    else if(k==='html') e.innerHTML=v;
+    else if(k==='disabled') e.disabled=!!v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else e.setAttribute(k,v);
+  });
+  (Array.isArray(children)?children:[children]).forEach(c=>{
+    if(c==null) return;
+    e.appendChild(typeof c==='string' ? document.createTextNode(c) : c);
+  });
+  return e;
 }
+function itemsText(items){ return items.map(i=>`${i.name}×${i.qty}`).join('　'); }
+function itemsHtml(items){ return itemsText(items).replace(/×(\d+)/g,'<span class="qty">×$1</span>'); }
+function cartToItems(cart){ return MENU.filter(m=>cart[m.name]>0).map(m=>({name:m.name, qty:cart[m.name]})); }
+function cartCount(cart){ return Object.values(cart).reduce((a,b)=>a+b,0); }
+function cartTotal(cart){ return MENU.reduce((s,m)=>s+(cart[m.name]||0)*m.price,0); }
+function elapsed(ts){ const s=Math.max(0,Math.floor((state.now-ts)/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} 経過`; }
+function timeStr(ts){ const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
-// ---------- 在庫 ----------
-function cartByFlavor(){
-  const by = {}; FLAVORS.forEach(f=>by[f]=0);
-  MENU.forEach(m=>{ by[m.flavor] += (state.cart[m.name]||0) * m.skewers; });
-  return by;
-}
-
-function cartTotalSkewers(){
-  return MENU.reduce((sum,m)=> sum + (state.cart[m.name]||0)*m.skewers, 0);
-}
-
-function canServeFromStock(){
-  const total = cartTotalSkewers();
-  if(total === 0 || total > STOCK_SERVE_MAX) return false;
-  const by = cartByFlavor();
-  return FLAVORS.every(f => (state.stock[f]||0) >= by[f]);
-}
-
-function isShortOfStock(){
-  const total = cartTotalSkewers();
-  if(total === 0 || total > STOCK_SERVE_MAX) return false;
-  return !canServeFromStock();
-}
-
-async function serveFromStock(){
-  const by = cartByFlavor();
-  const items = MENU
-    .filter(m=>state.cart[m.name]>0)
-    .map(m=>({name:m.name, qty:state.cart[m.name], price:m.price, skewers:m.skewers}));
+// ===== 操作 =====
+async function submitOrder(){
+  const items = cartToItems(state.cart);
   if(items.length===0) return;
-  const total = items.reduce((sum,i)=> sum + i.qty*i.price, 0);
-  const totalSkewers = items.reduce((sum,i)=> sum + i.qty*i.skewers, 0);
-
-  if(state.submitting) return;
-  state.submitting = true;
-  render();
-
-  try{
-    const data = await apiGetData();
-
-    const short = FLAVORS.find(f => (data.stock[f]||0) < by[f]);
-    if(short){
-      throw new Error(`${short}の在庫が足りません（残り${data.stock[short]||0}本）。画面を確認してください。`);
-    }
-
-    const newStock = Object.assign({}, data.stock);
-    FLAVORS.forEach(f=>{ newStock[f] = (newStock[f]||0) - by[f]; });
-
-    const now = Date.now();
-    const newOrder = {
-      id: 'o' + now + Math.random().toString(36).slice(2,7),
-      number: state.orderNumber.trim() || '直売',
-      items,
-      total,
-      totalSkewers,
-      status: 'served',
-      fromStock: true,
-      createdAt: now,
+  const now = Date.now();
+  state.cart = {};
+  await mutate(d=>{
+    const number = d.seq + 1;
+    const order = {id:'o'+now+Math.random().toString(36).slice(2,6), number, items, status:'new', createdAt:now, edited:false};
+    return {
+      orders:[...d.orders, order],
+      seq:number,
+      log:[...d.log, {at:now, action:'create', number, detail:itemsText(items)}],
     };
-
-    await apiSaveData({
-      orders: [...data.orders, newOrder],
-      log: data.log,
-      stock: newStock,
-      restock: data.restock,
-    });
-
-    state.cart = {};
-    state.orderNumber = '';
-    state.submitting = false;
-    await fetchOrders();
-  }catch(err){
-    state.submitting = false;
-    console.error('在庫提供エラー:', err);
-    alert('在庫からの提供に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-    render();
-  }
-}
-
-// 操作した数値を即座に画面に反映しつつ、裏でサーバーへ保存する統合関数
-async function saveStockToServer(flavor, newVal) {
-  // ① 即座にローカルの状態を更新し、もっさり感やカクつきをなくす（オプティミスティックUI）
-  state.stock[flavor] = newVal;
-  render();
-
-  // ② 保存中のフラグを立てて、裏の定期更新で上書きされないようにする
-  activeStockSaves++;
-  try {
-    const data = await apiGetData();
-    const newStock = Object.assign({}, data.stock);
-    newStock[flavor] = newVal; // 最新の計算済みの値を保存する
-    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: data.restock });
-    
-    // 保存後に最新状態を取り直す
-    fetchOrders();
-  } catch(err) {
-    console.error('在庫保存エラー:', err);
-  } finally {
-    activeStockSaves--;
-  }
-}
-
-function adjustStock(flavor, delta){
-  const newVal = Math.max(0, (state.stock[flavor]||0) + delta);
-  saveStockToServer(flavor, newVal);
-}
-
-function setStock(flavor, value){
-  const newVal = Math.max(0, parseInt(value, 10) || 0);
-  saveStockToServer(flavor, newVal);
-}
-
-async function requestRestock(flavor){
-  try{
-    const data = await apiGetData();
-    const newRestock = Object.assign({}, data.restock);
-    newRestock[flavor] = { status: 'requested', at: Date.now() };
-    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
-    await fetchOrders();
-  }catch(err){
-    console.error('補充依頼エラー:', err);
-    alert('補充依頼に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-  }
-}
-
-// 焼き場側：補充の本数を入力して運搬状態にする
-async function sendRestockFromGrill(flavor){
-  const input = prompt(`${flavor} を何本運びますか？`, '10');
-  if(input === null) return;
-  const n = parseInt(input, 10);
-  if(isNaN(n) || n <= 0){ alert('1以上の数字を入力してください。'); return; }
-
-  try{
-    const data = await apiGetData();
-    const newRestock = Object.assign({}, data.restock);
-    newRestock[flavor] = { status: 'delivering', at: Date.now(), count: n };
-    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
-    await fetchOrders();
-  }catch(err){
-    console.error('補充運搬開始エラー:', err);
-    alert('送信に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-  }
-}
-
-// 受付側：運ばれてきた補充をワンタップで受け取って在庫を増やす
-async function completeRestockAtReception(flavor){
-  const req = state.restock[flavor];
-  if(!req) return;
-  const n = req.count || 0;
-
-  try{
-    const data = await apiGetData();
-    const currentReq = data.restock[flavor];
-    const addCount = currentReq ? (currentReq.count || 0) : n;
-
-    const newStock = Object.assign({}, data.stock);
-    newStock[flavor] = (newStock[flavor]||0) + addCount;
-
-    const newRestock = Object.assign({}, data.restock);
-    newRestock[flavor] = null;
-
-    await apiSaveData({ orders: data.orders, log: data.log, stock: newStock, restock: newRestock });
-    await fetchOrders();
-  }catch(err){
-    console.error('補充受け取り完了エラー:', err);
-    alert('受け取り完了処理に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)));
-  }
-}
-
-async function cancelRestock(flavor){
-  if(!confirm(`${flavor} の補充依頼を取り消しますか？`)) return;
-  try{
-    const data = await apiGetData();
-    const newRestock = Object.assign({}, data.restock);
-    newRestock[flavor] = null;
-    await apiSaveData({ orders: data.orders, log: data.log, stock: data.stock, restock: newRestock });
-    await fetchOrders();
-  }catch(err){
-    console.error('補充取り消しエラー:', err);
-    alert('取り消しに失敗しました。');
-  }
-}
-
-function renderArrivalBanner(readyOrders){
-  const banner = el('div', {class:'arrival-banner'}, [
-    el('div', {class:'arrival-head'}, [
-      el('span', {class:'arrival-pulse'}, '🍢'),
-      el('span', {}, `焼き場から運んでいます（${readyOrders.length}件）`)
-    ])
-  ]);
-  readyOrders.forEach(o=>{
-    const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
-    banner.appendChild(el('div', {class:'arrival-row'}, [
-      el('div', {class:'arrival-left'}, [
-        el('div', {class:'arrival-num'}, [
-          el('span', {class:'arrival-num-label'}, 'No.'),
-          el('span', {class:'arrival-num-value'}, String(o.number))
-        ]),
-        el('div', {class:'arrival-items'}, items)
-      ]),
-      el('button', {class:'arrival-btn', onClick:()=>updateStatus(o.id,'served')}, [
-        el('div', {}, '受け取り完了'),
-        el('div', {class:'arrival-btn-sub'}, 'No.' + o.number)
-      ])
-    ]));
   });
-  return banner;
 }
 
-function renderRestockArrivalBanner(flavors){
-  const banner = el('div', {class:'arrival-banner restock-arrival'}, [
-    el('div', {class:'arrival-head'}, [
-      el('span', {class:'arrival-pulse'}, '📦'),
-      el('span', {}, '補充が届きます')
-    ])
-  ]);
-  flavors.forEach(f=>{
-    const req = state.restock[f];
-    const count = req ? (req.count || 0) : 0;
-    banner.appendChild(el('div', {class:'arrival-row'}, [
-      el('div', {class:'arrival-left'}, [
-        el('div', {class:'arrival-num'}, [
-          el('span', {class:'arrival-num-value restock-name'}, `${f} × ${count}本`)
-        ]),
-        el('div', {class:'arrival-items'}, '焼き場が運んできました')
-      ]),
-      el('button', {class:'arrival-btn', onClick:()=>completeRestockAtReception(f)}, [
-        el('div', {}, '受け取り完了'),
-        el('div', {class:'arrival-btn-sub'}, `＋${count}本を加算`)
-      ])
-    ]));
+async function markDone(id){
+  const now = Date.now();
+  await mutate(d=>{
+    const t = d.orders.find(o=>o.id===id);
+    const orders = d.orders.map(o=>o.id===id?{...o, status:'done', doneAt:now}:o);
+    const log = t ? [...d.log, {at:now, action:'done', number:t.number, detail:itemsText(t.items)}] : d.log;
+    return {orders, seq:d.seq, log};
   });
-  return banner;
 }
 
-function renderStockPanel(){
-  const panel = el('div', {class:'stock-panel'});
-  panel.appendChild(el('div', {class:'stock-head'}, `受付の在庫（${STOCK_SERVE_MAX}本以下はここから提供）`));
-  const grid = el('div', {class:'stock-grid'});
-  FLAVORS.forEach(f=>{
-    const n = state.stock[f] || 0;
-    const req = state.restock[f];
-    const box = el('div', {class:'stock-item' + (n===0 ? ' is-zero' : (n<=2 ? ' is-low' : ''))}, [
-      el('div', {class:'stock-name'}, f),
-      el('div', {class:'stock-count'}, [
-        el('input', {
-          class:'stock-num-input',
-          type:'text',
-          inputmode:'numeric',
-          value: (f in state.stockEditing) ? state.stockEditing[f] : String(n),
-          'data-focus-key':'stock-' + f,
-          onFocus:(e)=>{ state.stockEditing[f] = String(state.stock[f] || 0); e.target.select(); },
-          onInput:(e)=>{ state.stockEditing[f] = e.target.value; },
-          onBlur:(e)=>{ const v = e.target.value; delete state.stockEditing[f]; setStock(f, v); },
-          onKeyDown:(e)=>{ if(e.key === 'Enter') e.target.blur(); },
-        }),
-        el('span', {class:'stock-unit'}, '本')
+async function saveEdit(id, newItems){
+  if(newItems.length===0){ alert('商品が選ばれていません。取り消す場合は取消ボタンを使ってください。'); return; }
+  const now = Date.now();
+  state.editing = null;
+  await mutate(d=>{
+    const t = d.orders.find(o=>o.id===id);
+    const orders = d.orders.map(o=>o.id===id?{...o, items:newItems, edited:true}:o);
+    const log = t ? [...d.log, {at:now, action:'edit', number:t.number, detail:itemsText(t.items)+' → '+itemsText(newItems)}] : d.log;
+    return {orders, seq:d.seq, log};
+  });
+}
+
+async function cancelOrder(id){
+  const t = state.orders.find(o=>o.id===id);
+  if(!t) return;
+  if(!confirm(`No.${t.number} の注文を取り消しますか？`)) return;
+  const now = Date.now();
+  await mutate(d=>({
+    orders: d.orders.filter(o=>o.id!==id),
+    seq: d.seq,
+    log: [...d.log, {at:now, action:'cancel', number:t.number, detail:itemsText(t.items)}],
+  }));
+}
+
+async function resetAll(){
+  if(!confirm('全ての注文データを削除します。よろしいですか？')) return;
+  const alsoLog = confirm('入力履歴（ログ）も一緒に削除しますか？\n\nOK＝ログも削除 / キャンセル＝注文だけ削除して履歴は残す');
+  knownIds = new Set();
+  await mutate(d=>({orders:[], seq:0, log: alsoLog?[]:d.log}));
+}
+
+// ===== 描画 =====
+function render(){
+  const root = document.getElementById('root');
+  root.innerHTML = '';
+  if(!state.role){ root.appendChild(roleSelect()); }
+  else if(state.role==='order'){ root.appendChild(topbar('注文入力')); root.appendChild(orderScreen()); }
+  else { root.appendChild(topbar('焼き台')); root.appendChild(grillScreen()); }
+  if(state.editing) root.appendChild(editModal());
+}
+
+function topbar(label){
+  return el('div',{class:'topbar'},[
+    el('div',{class:'brand'},[
+      el('div',{class:'mark'},'🍢'),
+      el('div',{},[ el('div',{class:'title'},'焼き鳥注文システム'), el('div',{class:'subtitle'},'学校祭 出店') ]),
+    ]),
+    el('div',{style:'display:flex;align-items:center;gap:8px;'},[
+      el('div',{class:'role-badge'},label),
+      el('button',{class:'switch-btn', onClick:()=>{state.role=null; render();}},'役割変更'),
+    ]),
+  ]);
+}
+
+function roleSelect(){
+  return el('div',{class:'select-screen'},[
+    el('div',{class:'select-hero'},[
+      el('div',{class:'kanji'},'祭 · 焼 · 提'),
+      el('h1',{},'焼き鳥注文システム'),
+      el('p',{},'このスマホの役割を選んでください'),
+    ]),
+    el('div',{class:'role-options'},[
+      el('div',{class:'role-card order', onClick:()=>{state.role='order'; render();}},[
+        el('div',{class:'role-icon'},'📋'),
+        el('div',{},[ el('div',{class:'role-name'},'注文入力'), el('div',{class:'role-desc'},'お客さんの注文を入力する') ]),
       ]),
-      el('div', {class:'stock-steps'}, [
-        el('button', {onClick:()=>adjustStock(f,-1)}, '−'),
-        el('button', {onClick:()=>adjustStock(f,1)}, '＋'),
+      el('div',{class:'role-card grill', onClick:()=>{state.role='grill'; render();}},[
+        el('div',{class:'role-icon'},'🔥'),
+        el('div',{},[ el('div',{class:'role-name'},'焼き台'), el('div',{class:'role-desc'},'注文を見て焼く・完了する') ]),
       ]),
+    ]),
+    el('button',{class:'reset-link', onClick:resetAll},'（本番前テスト用）全データを削除'),
+  ]);
+}
+
+// ---- 注文入力画面 ----
+function orderScreen(){
+  const screen = el('div',{class:'screen'});
+  const doneOrders = state.orders.filter(o=>o.status==='done').sort((a,b)=>b.doneAt-a.doneAt);
+  const cooking = state.orders.filter(o=>o.status==='new').sort((a,b)=>a.createdAt-b.createdAt);
+
+  // 完了バナー（入力欄より上、見やすく）
+  if(doneOrders.length){
+    const banner = el('div',{class:'done-banner'},[
+      el('div',{class:'done-head'},[ el('span',{class:'done-pulse'},'✅'), el('span',{},`焼き上がり（${doneOrders.length}件）お客様にお渡し`) ]),
     ]);
-    if(!req){
-      box.appendChild(el('button', {class:'stock-req-btn', onClick:()=>requestRestock(f)}, '焼き場に補充を依頼'));
-    } else if(req.status === 'requested'){
-      box.appendChild(el('div', {class:'stock-req-state'}, '⏳ 依頼中…'));
-      box.appendChild(el('button', {class:'stock-cancel-btn', onClick:()=>cancelRestock(f)}, '依頼を取り消す'));
-    } else {
-      box.appendChild(el('div', {class:'stock-req-state is-coming'}, '🚶 運搬中'));
-    }
-    grid.appendChild(box);
-  });
-  panel.appendChild(grid);
-  return panel;
-}
-
-// ---------- order taking screen ----------
-function renderOrderScreen(){
-  const screen = el('div', {class:'screen'});
-
-  const activeOrders = state.orders.filter(o=>o.status!=='served').sort((a,b)=>a.createdAt-b.createdAt);
-  const readyOrders = activeOrders.filter(o=>o.status==='ready');
-  const cookingOrders = activeOrders.filter(o=>o.status!=='ready');
-  const servedOrders = state.orders.filter(o=>o.status==='served').sort((a,b)=>b.createdAt-a.createdAt);
-  const deliveringFlavors = FLAVORS.filter(f=>state.restock[f] && state.restock[f].status==='delivering');
-
-  if(readyOrders.length){
-    screen.appendChild(renderArrivalBanner(readyOrders));
-  }
-  if(deliveringFlavors.length){
-    screen.appendChild(renderRestockArrivalBanner(deliveringFlavors));
+    doneOrders.forEach(o=>{
+      banner.appendChild(el('div',{class:'done-row'},[
+        el('div',{class:'done-left'},[
+          el('div',{class:'done-num'},String(o.number)),
+          el('div',{class:'done-items'}, itemsText(o.items)),
+        ]),
+        el('button',{class:'done-btn', onClick:()=>cancelOrder(o.id)},'お渡し完了'),
+      ]));
+    });
+    screen.appendChild(banner);
   }
 
-  screen.appendChild(renderStockPanel());
-
-  screen.appendChild(el('div', {class:'section-label'}, '注文番号'));
-  const dupe = state.orderNumber.trim() !== '' &&
-    state.orders.some(o=>o.status!=='served' && String(o.number)===state.orderNumber.trim());
-  const numInput = el('input', {
-    class:'num-input' + (dupe ? ' is-dupe' : ''),
-    type:'text',
-    inputmode:'numeric',
-    placeholder:'例: 12',
-    value: state.orderNumber,
-    'data-focus-key':'ordernum',
-    onInput:(e)=>{ state.orderNumber = e.target.value; updateNumberUi(); },
-    onBlur:()=>{ render(); } // フォーカスが外れたタイミングで全体表示を同期
-  });
-  screen.appendChild(numInput);
-  screen.appendChild(el('div', {class:'num-warn' + (dupe ? '' : ' is-hidden')},
-    '⚠ この番号は現在対応中の注文で使われています'));
-
-  screen.appendChild(el('div', {class:'section-label'}, 'メニューを選ぶ'));
-  const grid = el('div', {class:'menu-grid'});
-  MENU.forEach(item=>{
-    const name = item.name;
-    const qty = state.cart[name] || 0;
-    grid.appendChild(el('div', {class:'menu-item'}, [
-      el('div', {class:'mname'}, name),
-      el('div', {class:'mprice'}, item.price + '円'),
-      el('div', {class:'stepper'}, [
-        el('button', {onClick:()=>{ state.cart[name]=Math.max(0,(state.cart[name]||0)-1); render(); }}, '−'),
-        el('div', {class:'qty'}, String(qty)),
-        el('button', {class:'plus', onClick:()=>{ state.cart[name]=(state.cart[name]||0)+1; render(); }}, '＋'),
-      ])
+  // メニュー
+  screen.appendChild(el('div',{class:'section-label'},'メニューを選ぶ'));
+  const grid = el('div',{class:'menu-grid'});
+  MENU.forEach(m=>{
+    const q = state.cart[m.name]||0;
+    grid.appendChild(el('div',{class:'menu-item'},[
+      el('div',{class:'mname'},m.name),
+      el('div',{class:'mprice'}, m.price+'円'),
+      el('div',{class:'stepper'},[
+        el('button',{onClick:()=>{state.cart[m.name]=Math.max(0,q-1); render();}},'−'),
+        el('div',{class:'qty'},String(q)),
+        el('button',{class:'plus', onClick:()=>{state.cart[m.name]=q+1; render();}},'＋'),
+      ]),
     ]));
   });
   screen.appendChild(grid);
 
-  const cartSkewers = cartTotalSkewers();
-  const stockOk = canServeFromStock();
-  if(stockOk){
-    screen.appendChild(el('div', {class:'stock-ready-note'}, [
-      el('div', {class:'stock-ready-main'}, '✅ 在庫からすぐ提供できます'),
-      el('div', {class:'stock-ready-sub'}, `${cartSkewers}本（${STOCK_SERVE_MAX}本以下）— 焼き場には送りません`)
-    ]));
-  } else {
-    const activeSkewersForWait = pendingSkewersInOrders(['new','grilling','ready']);
-    screen.appendChild(renderWaitEstimate(activeSkewersForWait + cartSkewers, {
-      label: cartSkewers > 0 ? 'この注文の予想待ち時間: ' : '現在の予想待ち時間: '
-    }));
-    if(isShortOfStock()){
-      screen.appendChild(el('div', {class:'stock-short-note'},
-        `⚠ ${STOCK_SERVE_MAX}本以下ですが在庫が足りないので、焼き場に送ります`));
-    }
-  }
-
-  screen.appendChild(el('div', {class:'section-label'}, '調理中の注文'));
-  if(cookingOrders.length===0){
-    screen.appendChild(el('div', {class:'empty-state'}, '調理中の注文はありません'));
-  } else {
-    cookingOrders.forEach(o=>screen.appendChild(renderOrderSideTicket(o)));
-  }
-
-  screen.appendChild(el('button', {class:'history-toggle', onClick:()=>{state.showHistory=!state.showHistory; render();}},
-    state.showHistory ? '提供済みを隠す' : `提供済みを表示（${servedOrders.length}件）`));
-  if(state.showHistory){
-    servedOrders.slice(0,20).forEach(o=>{
-      const t = renderOrderSideTicket(o);
-      t.classList.add('served-ticket');
-      screen.appendChild(t);
+  // 調理中の注文（訂正・取消できる）
+  screen.appendChild(el('div',{class:'section-label'},`調理中の注文（${cooking.length}件）`));
+  if(cooking.length===0){
+    screen.appendChild(el('div',{class:'empty-state'},'調理中の注文はありません'));
+  }else{
+    cooking.forEach(o=>{
+      screen.appendChild(el('div',{class:'ticket status-new'},[
+        el('div',{class:'ticket-top'},[
+          el('div',{class:'ticket-num'},String(o.number)),
+          el('div',{class:'ticket-time'}, elapsed(o.createdAt)),
+        ]),
+        el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
+        el('div',{class:'ticket-sub-actions'},[
+          el('button',{onClick:()=>openEdit(o.id)},'✏️ 訂正'),
+          el('button',{class:'danger', onClick:()=>cancelOrder(o.id)},'取消'),
+        ]),
+      ]));
     });
   }
-  screen.appendChild(el('button', {class:'history-toggle', onClick:downloadCsv}, `📥 待ち時間ログをCSVでダウンロード（${state.log.length}件）`));
 
-  const cartCount = Object.values(state.cart).reduce((a,b)=>a+b,0);
-  const cartTotal = MENU.reduce((sum,m)=> sum + (state.cart[m.name]||0)*m.price, 0);
-  const numReady = state.orderNumber.trim() !== '';
-  const cartBar = el('div', {class:'cart-bar'}, [
-    el('div', {class:'cart-info'}, [
-      numReady
-        ? el('div', {class:'cart-num'}, 'No.' + state.orderNumber.trim())
-        : el('div', {class:'cart-num' + (stockOk ? ' is-optional' : ' is-empty')}, stockOk ? '番号なしでOK' : '番号を入力'),
-      el('div', {}, [
-        document.createTextNode('選択中: '),
-        el('b', {}, String(cartCount) + '点'),
-        document.createTextNode(' 合計 '),
-        el('b', {}, cartTotal.toLocaleString() + '円')
-      ])
+  // 履歴
+  screen.appendChild(el('button',{class:'history-toggle', onClick:()=>{state.showLog=!state.showLog; render();}},
+    state.showLog?'入力履歴を隠す':`入力履歴を表示（${state.log.length}件）`));
+  if(state.showLog){
+    const box = el('div',{});
+    [...state.log].reverse().slice(0,50).forEach(l=>{
+      const label = {create:'新規',edit:'訂正',done:'完了',cancel:'取消'}[l.action]||l.action;
+      box.appendChild(el('div',{class:'log-item'},[
+        el('span',{class:'log-time'}, timeStr(l.at)+'  '),
+        el('span',{class:'log-act '+l.action}, `[${label}] No.${l.number} `),
+        document.createTextNode(l.detail||''),
+      ]));
+    });
+    screen.appendChild(box);
+  }
+
+  // カートバー
+  const cnt = cartCount(state.cart);
+  const bar = el('div',{class:'cart-bar'},[
+    el('div',{class:'cart-info'},[
+      document.createTextNode('選択中: '), el('b',{},cnt+'点'),
+      document.createTextNode('　合計 '), el('b',{}, cartTotal(state.cart).toLocaleString()+'円'),
     ]),
-    stockOk
-      ? el('button', {class:'submit-btn stock-btn', disabled: state.submitting, onClick:serveFromStock},
-          state.submitting ? '処理中…' : '在庫から提供')
-      : el('button', {class:'submit-btn', disabled: (cartCount===0 || !numReady || state.submitting), onClick:submitOrder},
-          state.submitting ? '送信中…' : '注文を送信')
+    el('button',{class:'submit-btn', disabled: cnt===0, onClick:submitOrder},'注文を送信'),
   ]);
-
-  const wrap = el('div', {});
-  wrap.appendChild(screen);
-  wrap.appendChild(cartBar);
+  const wrap = el('div',{});
+  wrap.appendChild(screen); wrap.appendChild(bar);
   return wrap;
 }
 
-function renderOrderSideTicket(o){
-  const items = o.items.map(i=>`${i.name}×${i.qty}`).join(' ');
-  const t = el('div', {class:'ticket status-'+o.status}, [
-    el('div', {class:'ticket-top'}, [
-      el('div', {class:'ticket-num'}, String(o.number)),
-      // 経過時間の自動更新用データ属性を付与
-      el('div', {class:'ticket-time', 'data-created-at': o.createdAt}, elapsed(o.createdAt))
-    ]),
-    el('div', {class:'status-pill status-'+o.status}, statusLabel(o.status)),
-    el('div', {class:'ticket-items'}, items),
-    el('div', {class:'ticket-total'}, (o.total||0).toLocaleString() + '円')
-  ]);
-  if(o.status==='ready'){
-    t.appendChild(el('button', {class:'ticket-action served', onClick:()=>updateStatus(o.id,'served')}, 'お客様に提供完了'));
-  }
-  return t;
-}
-
-async function submitOrder(){
-  const orderNumber = state.orderNumber.trim();
-  if(orderNumber === ''){ alert('注文番号を入力してください。'); return; }
-
-  const items = MENU
-    .filter(m=>state.cart[m.name]>0)
-    .map(m=>({name:m.name, qty:state.cart[m.name], price:m.price, skewers:m.skewers}));
-  if(items.length===0) return;
-  const total = items.reduce((sum,i)=> sum + i.qty*i.price, 0);
-  const totalSkewers = items.reduce((sum,i)=> sum + i.qty*i.skewers, 0);
-
-  const dupe = state.orders.some(o=>o.status!=='served' && String(o.number)===orderNumber);
-  if(dupe && !confirm(`番号 ${orderNumber} は現在対応中の注文で既に使われています。\nこのまま送信しますか？`)) return;
-
-  if(state.submitting) return;
-  state.submitting = true;
-  render();
-
-  try{
-    if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf('http') !== 0){
-      throw new Error('APPS_SCRIPT_URLが未設定です。コード内のURLを、デプロイしたApps ScriptのURLに書き換えてください。');
-    }
-
-    let latestOrders = [], latestLog = state.log;
-    try{
-      const data = await apiGetData();
-      latestOrders = data.orders;
-      latestLog = data.log;
-    }catch(e){
-      latestOrders = [];
-    }
-
-    const newOrder = {
-      id: 'o' + Date.now() + Math.random().toString(36).slice(2,7),
-      number: orderNumber,
-      items,
-      total,
-      totalSkewers,
-      status: 'new',
-      createdAt: Date.now(),
-    };
-    latestOrders.push(newOrder);
-
-    await apiSaveData({ orders: latestOrders, log: latestLog });
-
-    state.cart = {};
-    state.orderNumber = '';
-    state.submitting = false;
-    await fetchOrders();
-  }catch(err){
-    state.submitting = false;
-    console.error('注文送信エラー:', err);
-    alert('注文の送信に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)) + '\n\nもう一度お試しください。');
-    render();
-  }
-}
-
-// ---------- grill screen ----------
-function renderRestockCard(flavor, req){
-  const isDelivering = req.status==='delivering';
-  const card = el('div', {class:'restock-card' + (isDelivering ? ' is-delivering' : '')}, [
-    el('div', {class:'restock-top'}, [
-      el('div', {class:'restock-title'}, [
-        el('span', {class:'restock-icon'}, '📦'),
-        el('span', {}, flavor + ' の補充依頼')
-      ]),
-      // 経過時間の自動更新用データ属性を付与
-      el('div', {class:'ticket-time', 'data-created-at': req.at}, elapsed(req.at))
-    ]),
-    el('div', {class:'restock-note'}, isDelivering
-      ? `運搬中（${req.count || 0}本） — 受付の受け取りボタン待ちです`
-      : '受付の在庫が切れています。焼けた分を室内へ運んでください。')
-  ]);
-  if(req.status === 'requested'){
-    card.appendChild(el('button', {class:'ticket-action restock-action', onClick:()=>sendRestockFromGrill(flavor)}, '焼けた本数を入力して運ぶ'));
-  }
-  return card;
-}
-
-function renderGrillScreen(){
-  const screen = el('div', {class:'screen'});
-  const activeOrders = state.orders.filter(o=>o.status==='new' || o.status==='grilling').sort((a,b)=>a.createdAt-b.createdAt);
-  const restockFlavors = FLAVORS.filter(f=>state.restock[f]);
-
-  if(restockFlavors.length){
-    screen.appendChild(el('div', {class:'section-label'}, '📦 受付から補充依頼'));
-    restockFlavors.forEach(f=>screen.appendChild(renderRestockCard(f, state.restock[f])));
-  }
-
-  const pendingSkewers = pendingSkewersInOrders(['new','grilling']);
-  screen.appendChild(renderWaitEstimate(pendingSkewers, { label: '今から出す注文の目安: ' }));
-
-  screen.appendChild(el('div', {class:'section-label'}, `対応中の注文（${activeOrders.length}件）`));
-  if(activeOrders.length===0){
-    screen.appendChild(el('div', {class:'empty-state'}, '新しい注文はありません'));
-  } else {
-    activeOrders.forEach(o=>screen.appendChild(renderGrillTicket(o)));
+// ---- 焼き台画面 ----
+function grillScreen(){
+  const screen = el('div',{class:'screen'});
+  const cooking = state.orders.filter(o=>o.status==='new').sort((a,b)=>a.createdAt-b.createdAt);
+  screen.appendChild(el('div',{class:'section-label'},`焼く注文（${cooking.length}件）`));
+  if(cooking.length===0){
+    screen.appendChild(el('div',{class:'empty-state'},'新しい注文はありません'));
+  }else{
+    cooking.forEach(o=>{
+      screen.appendChild(el('div',{class:'ticket status-new'},[
+        el('div',{class:'ticket-top'},[
+          el('div',{class:'ticket-num'},String(o.number)),
+          el('div',{class:'ticket-time'}, elapsed(o.createdAt)),
+        ]),
+        el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
+        el('button',{class:'ticket-action done', onClick:()=>markDone(o.id)},'焼き上がり・完了'),
+      ]));
+    });
   }
   return screen;
 }
 
-function renderGrillTicket(o){
-  const items = o.items.map(i=>`${i.name} <span>×${i.qty}</span>`).join(' ');
-  const t = el('div', {class:'ticket status-'+o.status}, [
-    el('div', {class:'ticket-top'}, [
-      el('div', {class:'ticket-num'}, String(o.number)),
-      // 経過時間の自動更新用データ属性を付与
-      el('div', {class:'ticket-time', 'data-created-at': o.createdAt}, elapsed(o.createdAt))
-    ]),
-    el('div', {class:'status-pill status-'+o.status}, statusLabel(o.status)),
-    el('div', {class:'ticket-items', html: items})
-  ]);
-  if(o.status==='new'){
-    t.appendChild(el('button', {class:'ticket-action grilling', onClick:()=>updateStatus(o.id,'grilling')}, '焼き始める'));
-  } else if(o.status==='grilling'){
-    t.appendChild(el('button', {class:'ticket-action ready', onClick:()=>updateStatus(o.id,'ready')}, '焼き上がり！'));
-  }
-  return t;
+// ---- 訂正モーダル ----
+function openEdit(id){
+  const o = state.orders.find(x=>x.id===id);
+  if(!o) return;
+  const cart = {};
+  o.items.forEach(i=>{ cart[i.name] = i.qty; });
+  state.editing = {id, cart};
+  render();
 }
 
-async function updateStatus(id, newStatus){
-  try{
-    let latestOrders = [], latestLog = state.log;
-    try{
-      const data = await apiGetData();
-      latestOrders = data.orders;
-      latestLog = data.log;
-    }catch(e){ latestOrders = []; }
-
-    if(newStatus === 'served'){
-      const target = latestOrders.find(o=>o.id===id);
-      if(target && target.status !== 'served'){
-        const servedAt = Date.now();
-        const waitSeconds = Math.max(1, Math.round((servedAt - target.createdAt) / 1000));
-        const skewers = target.totalSkewers || target.items.reduce((s,i)=>s + i.qty*(i.skewers||1), 0);
-        latestLog = [...latestLog, { id: target.id, skewers, waitSeconds, servedAt }];
-      }
-    }
-
-    latestOrders = latestOrders.map(o => o.id===id ? {...o, status:newStatus} : o);
-    await apiSaveData({ orders: latestOrders, log: latestLog });
-    await fetchOrders();
-  }catch(err){
-    console.error('ステータス更新エラー:', err);
-    alert('更新に失敗しました。\n\n理由: ' + (err && err.message ? err.message : String(err)) + '\n\nもう一度お試しください。');
-  }
-}
-
-// ---------- 待ち時間予測 ----------
-function avgSecPerSkewer(){
-  if(!state.log || state.log.length < MIN_LOG_FOR_ESTIMATE) return null;
-  const totalSec = state.log.reduce((s,l)=>s + l.waitSeconds, 0);
-  const totalSkewers = state.log.reduce((s,l)=>s + l.skewers, 0);
-  if(totalSkewers === 0) return null;
-  return totalSec / totalSkewers;
-}
-
-function pendingSkewersInOrders(statuses){
-  return state.orders
-    .filter(o=>statuses.includes(o.status))
-    .reduce((s,o)=> s + (o.totalSkewers || o.items.reduce((a,i)=>a + i.qty*(i.skewers||1), 0)), 0);
-}
-
-function formatWait(seconds){
-  const m = Math.round(seconds/60);
-  if(m <= 0) return 'まもなく';
-  if(m < 1) return '1分未満';
-  return `約${m}分`;
-}
-
-function renderWaitEstimate(pendingSkewers, opts={}){
-  const avg = avgSecPerSkewer();
-  const usingDefault = avg === null;
-  const secPerSkewer = avg === null ? DEFAULT_SEC_PER_SKEWER : avg;
-  const seconds = pendingSkewers * secPerSkewer;
-  const box = el('div', {class:'wait-estimate' + (usingDefault ? ' is-default' : '')}, [
-    el('div', {class:'wait-main'}, [
-      el('span', {class:'wait-icon'}, '⏱'),
-      el('span', {class:'wait-text'}, opts.label || '予想待ち時間: '),
-      el('span', {class:'wait-value'}, formatWait(seconds)),
-    ]),
-    el('div', {class:'wait-sub'},
-      usingDefault
-        ? `（実績データ収集中のため仮の目安／1本${DEFAULT_SEC_PER_SKEWER}秒換算）`
-        : `（実績平均：1本あたり約${Math.round(avg)}秒／記録${state.log.length}件）`
-    )
-  ]);
-  return box;
-}
-
-function buildCsv(){
-  const header = '注文ID,本数,提供までの秒数,提供時刻\n';
-  const rows = state.log.map(l=>{
-    const t = new Date(l.servedAt).toLocaleString('ja-JP');
-    return `${l.id},${l.skewers},${l.waitSeconds},${t}`;
-  }).join('\n');
-  return header + rows;
-}
-
-function downloadCsv(){
-  if(!state.log || state.log.length===0){ alert('まだログがありません。'); return; }
-  const csv = buildCsv();
-  const blob = new Blob(["\uFEFF" + csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'yakitori-wait-log.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function statusLabel(s){
-  return {new:'待ち', grilling:'焼いています', ready:'出来上がり', served:'提供済み'}[s] || s;
-}
-
-function elapsed(createdAt){
-  const sec = Math.max(0, Math.floor((state.now - createdAt)/1000));
-  const m = Math.floor(sec/60), s = sec%60;
-  return `${m}:${String(s).padStart(2,'0')} 経過`;
-}
-
-// 画面全体を再描画せず、経過時間の文字列のみをピンポイントで書き換える高速化関数
-function updateElapsedTimes(){
-  const now = Date.now();
-  document.querySelectorAll('.ticket-time').forEach(el => {
-    const createdAt = parseInt(el.getAttribute('data-created-at'), 10);
-    if(!isNaN(createdAt)){
-      const sec = Math.max(0, Math.floor((now - createdAt)/1000));
-      const m = Math.floor(sec/60), s = sec%60;
-      el.textContent = `${m}:${String(s).padStart(2,'0')} 経過`;
-    }
+function editModal(){
+  const o = state.orders.find(x=>x.id===state.editing.id);
+  if(!o){ state.editing=null; return el('div',{}); }
+  const cart = state.editing.cart;
+  const grid = el('div',{class:'menu-grid'});
+  MENU.forEach(m=>{
+    const q = cart[m.name]||0;
+    grid.appendChild(el('div',{class:'menu-item'},[
+      el('div',{class:'mname'},m.name),
+      el('div',{class:'mprice'}, m.price+'円'),
+      el('div',{class:'stepper'},[
+        el('button',{onClick:()=>{cart[m.name]=Math.max(0,q-1); render();}},'−'),
+        el('div',{class:'qty'},String(q)),
+        el('button',{class:'plus', onClick:()=>{cart[m.name]=q+1; render();}},'＋'),
+      ]),
+    ]));
   });
+  return el('div',{class:'modal-back', onClick:(e)=>{ if(e.target.classList.contains('modal-back')){state.editing=null; render();} }},[
+    el('div',{class:'modal'},[
+      el('div',{class:'modal-title'},`No.${o.number} を訂正`),
+      el('div',{class:'modal-sub'},'数量を直して保存すると、焼き台にすぐ反映されます'),
+      grid,
+      el('div',{class:'modal-actions'},[
+        el('button',{class:'modal-cancel', onClick:()=>{state.editing=null; render();}},'やめる'),
+        el('button',{class:'modal-save', onClick:()=>saveEdit(o.id, cartToItems(cart))},'保存'),
+      ]),
+    ]),
+  ]);
 }
 
-// ---------- init ----------
+// ===== 起動 =====
 render();
-fetchOrders();
-setInterval(fetchOrders, 2500); // サーバーからの定期取得
-
-// 毎秒の全体再描画(render)を完全に廃止。部分書き換えのみにしてCPU負荷をほぼゼロに
-setInterval(()=>{
-  state.now = Date.now();
-  if (state.role && !isUserTyping()) {
-    updateElapsedTimes();
-  }
-}, 1000);
+poll();
+setInterval(poll, 2500);
+setInterval(()=>{ state.now=Date.now(); if(state.role) render(); }, 1000);
 </script>
 </body>
 </html>
