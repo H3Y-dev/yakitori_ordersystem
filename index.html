@@ -56,6 +56,15 @@
   .section-label{font-size:12px; font-weight:700; color:var(--smoke); letter-spacing:0.08em; margin:18px 4px 8px;}
   .section-label:first-child{margin-top:4px;}
 
+  .num-input{width:100%; background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:12px;
+    padding:14px; color:var(--cream); font-size:22px; font-weight:900; text-align:center;
+    font-family:inherit; font-variant-numeric:tabular-nums; letter-spacing:0.05em;}
+  .num-input:focus{outline:none; border-color:var(--ember);}
+  .num-input.is-dupe{border-color:var(--danger);}
+  .num-warn{font-size:11px; color:#ef7c7c; margin-top:6px; text-align:center;}
+  .num-warn.is-hidden{display:none;}
+  .cart-num{font-size:15px; font-weight:900; color:var(--amber); font-variant-numeric:tabular-nums;}
+  .cart-num.is-empty{color:var(--danger); font-size:12px; font-weight:700;}
   .menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .menu-item{background:var(--charcoal-2); border:1.5px solid var(--line); border-radius:14px;
     padding:12px; display:flex; flex-direction:column; gap:7px;}
@@ -155,6 +164,7 @@ let state = {
   seq: 0,              // 注文番号の採番用
   log: [],             // {at, action:'create'|'edit'|'done'|'cancel', number, detail}
   cart: {},
+  orderNumber: '',     // 受付で手入力する注文番号（整理券の番号など）
   now: Date.now(),
   showLog: false,
   editing: null,       // 訂正中 {id, cart}
@@ -271,16 +281,20 @@ function timeStr(ts){ const d=new Date(ts); return `${String(d.getHours()).padSt
 
 // ===== 操作 =====
 async function submitOrder(){
+  const number = state.orderNumber.trim();
+  if(number===''){ alert('注文番号を入力してください。'); return; }
   const items = cartToItems(state.cart);
   if(items.length===0) return;
+  const dupe = state.orders.some(o=>String(o.number)===number);
+  if(dupe && !confirm(`番号 ${number} は現在対応中の注文で既に使われています。\nこのまま送信しますか？`)) return;
   const now = Date.now();
   state.cart = {};
+  state.orderNumber = '';
   await mutate(d=>{
-    const number = d.seq + 1;
     const order = {id:'o'+now+Math.random().toString(36).slice(2,6), number, items, status:'new', createdAt:now, edited:false};
     return {
       orders:[...d.orders, order],
-      seq:number,
+      seq:d.seq,
       log:[...d.log, {at:now, action:'create', number, detail:itemsText(items)}],
     };
   });
@@ -330,11 +344,22 @@ async function resetAll(){
 // ===== 描画 =====
 function render(){
   const root = document.getElementById('root');
+  // 再描画で入力中のフォーカスが飛ばないよう控えておく
+  const active = document.activeElement;
+  let focusKey = null, selStart = null, selEnd = null;
+  if(active && active.tagName==='INPUT' && active.dataset && active.dataset.focusKey){
+    focusKey = active.dataset.focusKey;
+    try{ selStart=active.selectionStart; selEnd=active.selectionEnd; }catch(e){}
+  }
   root.innerHTML = '';
   if(!state.role){ root.appendChild(roleSelect()); }
   else if(state.role==='order'){ root.appendChild(topbar('注文入力')); root.appendChild(orderScreen()); }
   else { root.appendChild(topbar('焼き台')); root.appendChild(grillScreen()); }
   if(state.editing) root.appendChild(editModal());
+  if(focusKey){
+    const again = root.querySelector('input[data-focus-key="'+focusKey+'"]');
+    if(again){ again.focus({preventScroll:true}); if(selStart!==null){ try{ again.setSelectionRange(selStart,selEnd); }catch(e){} } }
+  }
 }
 
 function topbar(label){
@@ -394,6 +419,18 @@ function orderScreen(){
     screen.appendChild(banner);
   }
 
+  // 注文番号
+  screen.appendChild(el('div',{class:'section-label'},'注文番号'));
+  const num = state.orderNumber.trim();
+  const dupe = num!=='' && state.orders.some(o=>String(o.number)===num);
+  screen.appendChild(el('input',{
+    class:'num-input'+(dupe?' is-dupe':''),
+    type:'text', inputmode:'numeric', placeholder:'例: 12',
+    value: state.orderNumber, 'data-focus-key':'ordernum',
+    onInput:(e)=>{ state.orderNumber=e.target.value; updateNumberUi(); },
+  }));
+  screen.appendChild(el('div',{class:'num-warn'+(dupe?'':' is-hidden')},'⚠ この番号は現在対応中の注文で使われています'));
+
   // メニュー
   screen.appendChild(el('div',{class:'section-label'},'メニューを選ぶ'));
   const grid = el('div',{class:'menu-grid'});
@@ -449,16 +486,35 @@ function orderScreen(){
 
   // カートバー
   const cnt = cartCount(state.cart);
+  const numReady = state.orderNumber.trim()!=='';
   const bar = el('div',{class:'cart-bar'},[
     el('div',{class:'cart-info'},[
-      document.createTextNode('選択中: '), el('b',{},cnt+'点'),
-      document.createTextNode('　合計 '), el('b',{}, cartTotal(state.cart).toLocaleString()+'円'),
+      numReady
+        ? el('div',{class:'cart-num'}, 'No.'+state.orderNumber.trim())
+        : el('div',{class:'cart-num is-empty'}, '番号を入力'),
+      el('div',{},[
+        document.createTextNode('選択中: '), el('b',{},cnt+'点'),
+        document.createTextNode('　合計 '), el('b',{}, cartTotal(state.cart).toLocaleString()+'円'),
+      ]),
     ]),
-    el('button',{class:'submit-btn', disabled: cnt===0, onClick:submitOrder},'注文を送信'),
+    el('button',{class:'submit-btn', disabled: (cnt===0||!numReady), onClick:submitOrder},'注文を送信'),
   ]);
   const wrap = el('div',{});
   wrap.appendChild(screen); wrap.appendChild(bar);
   return wrap;
+}
+
+// 番号入力中はフルレンダーせず、関係する部分だけ更新（フォーカス維持）
+function updateNumberUi(){
+  const num = state.orderNumber.trim();
+  const dupe = num!=='' && state.orders.some(o=>String(o.number)===num);
+  const input = document.querySelector('.num-input');
+  if(input) input.classList.toggle('is-dupe', dupe);
+  const warn = document.querySelector('.num-warn');
+  if(warn) warn.classList.toggle('is-hidden', !dupe);
+  const cnt = cartCount(state.cart);
+  const btn = document.querySelector('.submit-btn');
+  if(btn) btn.disabled = (cnt===0 || num==='');
 }
 
 // ---- 焼き台画面 ----
