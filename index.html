@@ -153,6 +153,21 @@
   .log-item .log-act.done{color:var(--ready);}
   .log-item .log-act.cancel{color:var(--danger);}
 
+  .sales-summary{background:var(--charcoal-2); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-top:8px;}
+  .sales-head{font-size:12px; font-weight:700; color:var(--smoke); letter-spacing:0.05em; margin-bottom:8px;}
+  .sales-row{display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:5px 0;
+    font-size:14px; border-bottom:1px solid rgba(58,50,44,0.5);}
+  .sales-row:last-child{border-bottom:none;}
+  .sales-row.total{margin-top:4px; padding-top:8px; border-top:1.5px solid var(--line); font-weight:900;}
+  .sales-name{flex:1; color:var(--cream);}
+  .sales-qty{color:var(--smoke); font-variant-numeric:tabular-nums; min-width:44px; text-align:right;}
+  .sales-amt{color:var(--amber); font-weight:900; font-variant-numeric:tabular-nums; min-width:72px; text-align:right;}
+  .sales-row.total .sales-name{font-size:12px;}
+  .excel-btn{width:100%; margin-top:10px; border:none; border-radius:10px; padding:13px;
+    font-size:14px; font-weight:900; cursor:pointer; color:white;
+    background:linear-gradient(135deg,var(--ready),var(--ready-2)); box-shadow:0 4px 14px rgba(111,174,92,0.3);}
+
   @media (min-width:601px){ #root{max-width:600px; margin:0 auto; border-left:1px solid var(--line); border-right:1px solid var(--line);} }
 </style>
 </head>
@@ -204,23 +219,57 @@ async function apiSave(data){
   });
   if(!res.ok) throw new Error('サーバーエラー: ' + res.status);
   const r = await res.json();
-  if(!r || r.ok !== true) throw new Error('保存に失敗しました');
-  return r;
+  return r; // {ok:true,...} または {ok:false, conflict:true, current:{...}} など
 }
 
-// 押した瞬間に画面へ反映し、保存は裏で行う（失敗時のみ元に戻す）
+// 保存の実処理：競合したらサーバー最新に自分の操作を再適用して再送（最大5回）
+// fn は現在データ {orders,seq,rev,log} を受け取り、新データを返す純粋関数。
+async function commit(fn){
+  let base = {orders:state.orders, seq:state.seq, rev:state.rev, log:state.log};
+  for(let attempt=0; attempt<5; attempt++){
+    const next = fn({orders:base.orders, seq:base.seq, rev:base.rev, log:base.log});
+    next.rev = (base.rev || 0) + 1;
+    const r = await apiSave({orders:next.orders, seq:next.seq, rev:next.rev, log:next.log});
+    if(r && r.ok){
+      return next; // 成功
+    }
+    if(r && r.conflict && r.current){
+      // 誰かが先に書いていた → サーバー最新を土台にして、自分の操作をやり直す
+      base = {orders:r.current.orders||[], seq:r.current.seq||0, rev:r.current.rev||0, log:r.current.log||[]};
+      continue;
+    }
+    if(r && r.retry){
+      await new Promise(res=>setTimeout(res, 300)); // サーバーが混雑 → 少し待って再試行
+      continue;
+    }
+    throw new Error((r && r.error) ? r.error : '保存に失敗しました');
+  }
+  throw new Error('混雑のため保存できませんでした（時間をおいて再度お試しください）');
+}
+
+// 押した瞬間に画面へ反映し、保存は裏で行う。
+// 競合したらサーバー最新に自分の操作を再適用して再送するので、複数台同時でも消えない。
 async function mutate(fn){
   const prev = {orders:state.orders, seq:state.seq, rev:state.rev, log:state.log};
-  const next = fn({orders:state.orders, seq:state.seq, rev:state.rev, log:state.log});
-  next.rev = (state.rev || 0) + 1;      // 版を1つ進める
-  myRev = next.rev;
-  state.orders = next.orders; state.seq = next.seq; state.rev = next.rev; state.log = next.log;
-  lastSnapshot = JSON.stringify(next.orders) + '|' + JSON.stringify(next.log);
+  // ① まず手元のデータに適用して即座に画面へ反映
+  const optimistic = fn({orders:state.orders, seq:state.seq, rev:state.rev, log:state.log});
+  optimistic.rev = (state.rev || 0) + 1;
+  myRev = optimistic.rev;
+  state.orders = optimistic.orders; state.seq = optimistic.seq; state.rev = optimistic.rev; state.log = optimistic.log;
+  lastSnapshot = JSON.stringify(optimistic.orders) + '|' + JSON.stringify(optimistic.log);
   render();
+
+  // ② 裏で確定（競合時は最新に再適用して再送）
   pendingWrites++;
   try{
-    await apiSave({orders:next.orders, seq:next.seq, rev:next.rev, log:next.log});
+    const saved = await commit(fn);
+    // 再適用の結果でローカルを最終同期
+    state.orders = saved.orders; state.seq = saved.seq; state.rev = saved.rev; state.log = saved.log;
+    myRev = saved.rev;
+    lastSnapshot = JSON.stringify(saved.orders) + '|' + JSON.stringify(saved.log);
+    render();
   }catch(err){
+    // 完全に失敗 → 元に戻す
     state.orders = prev.orders; state.seq = prev.seq; state.rev = prev.rev; state.log = prev.log;
     myRev = prev.rev;
     lastSnapshot = JSON.stringify(prev.orders) + '|' + JSON.stringify(prev.log);
@@ -301,421 +350,37 @@ function el(tag, props={}, children=[]){
   });
   return e;
 }
-function itemsText(items){ return items.map(i=>`${i.name}×${i.qty}`).join('　'); }
-function itemsHtml(items){ return itemsText(items).replace(/×(\d+)/g,'<span class="qty">×$1</span>'); }
+function itemsText(items){ return items.map(i=>`${i.name}×${i.qty}`).join('　'); }function itemsHtml(items){ return itemsText(items).replace(/×(\d+)/g,'<span class="qty">×$1</span>'); }
 function cartToItems(cart){ return MENU.filter(m=>cart[m.name]>0).map(m=>({name:m.name, qty:cart[m.name]})); }
 function cartCount(cart){ return Object.values(cart).reduce((a,b)=>a+b,0); }
 function cartTotal(cart){ return MENU.reduce((s,m)=>s+(cart[m.name]||0)*m.price,0); }
 function elapsed(ts){ const s=Math.max(0,Math.floor((state.now-ts)/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} 経過`; }
 function timeStr(ts){ const d=new Date(ts); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
-// 注文の串本数
-function orderSkewers(o){
-  return o.items.reduce((s,i)=>{
-    const m = MENU.find(x=>x.name===i.name);
-    return s + i.qty * (m ? m.skewers : 1);
-  }, 0);
-}
-// 完了実績から「1本あたり平均秒」を算出（なければnull）
-function avgSecPerSkewer(){
-  const done = state.orders.filter(o=>o.status==='done' && o.doneAt!=null && o.createdAt!=null);
-  if(done.length < MIN_DONE_FOR_ESTIMATE) return null;
-  let totalSec=0, totalSkewers=0;
-  done.forEach(o=>{ totalSec += (o.doneAt-o.createdAt)/1000; totalSkewers += orderSkewers(o); });
-  if(totalSkewers===0) return null;
-  return totalSec/totalSkewers;
-}
-// 未完了の全注文の合計串本数
-function pendingSkewers(){
-  return state.orders.filter(o=>o.status==='new').reduce((s,o)=>s+orderSkewers(o),0);
-}
-function formatWait(sec){
-  if(sec < 30) return 'まもなく';
-  if(sec < 60) return '1分未満';
-  return `約${Math.round(sec/60)}分`;
-}
-
-// ===== 操作 =====
-async function submitOrder(){
-  const number = state.orderNumber.trim();
-  if(number===''){ alert('注文番号を入力してください。'); return; }
-  const items = cartToItems(state.cart);
-  if(items.length===0) return;
-  const dupe = state.orders.some(o=>String(o.number)===number);
-  if(dupe && !confirm(`番号 ${number} は現在対応中の注文で既に使われています。\nこのまま送信しますか？`)) return;
-  const now = Date.now();
-  state.cart = {};
-  state.orderNumber = '';
-  await mutate(d=>{
-    const order = {id:'o'+now+Math.random().toString(36).slice(2,6), number, items, status:'new', createdAt:now, edited:false};
-    return {
-      orders:[...d.orders, order],
-      seq:d.seq,
-      log:[...d.log, {at:now, action:'create', number, detail:itemsText(items)}],
-    };
-  });
-}
-
-async function markDone(id){
-  const now = Date.now();
-  await mutate(d=>{
-    const t = d.orders.find(o=>o.id===id);
-    const orders = d.orders.map(o=>o.id===id?{...o, status:'done', doneAt:now}:o);
-    const log = t ? [...d.log, {at:now, action:'done', number:t.number, detail:itemsText(t.items)}] : d.log;
-    return {orders, seq:d.seq, log};
-  });
-}
-
-async function saveEdit(id, newItems, newNumberRaw){
-  if(newItems.length===0){ alert('商品が選ばれていません。取り消す場合は取消ボタンを使ってください。'); return; }
-  const newNumber = (newNumberRaw||'').trim();
-  if(newNumber===''){ alert('注文番号を入力してください。'); return; }
-  // 自分以外に同じ番号があれば確認
-  const dupe = state.orders.some(o=>o.id!==id && String(o.number)===newNumber);
-  if(dupe && !confirm(`番号 ${newNumber} は他の対応中の注文で使われています。\nこのまま保存しますか？`)) return;
-
-  const now = Date.now();
-  state.editing = null;
-  await mutate(d=>{
-    const t = d.orders.find(o=>o.id===id);
-    const orders = d.orders.map(o=>o.id===id?{...o, number:newNumber, items:newItems, edited:true}:o);
-    let detail = '';
-    if(t){
-      const numChanged = String(t.number)!==newNumber;
-      const parts = [];
-      if(numChanged) parts.push(`番号 ${t.number}→${newNumber}`);
-      parts.push(itemsText(t.items)+' → '+itemsText(newItems));
-      detail = parts.join(' / ');
-    }
-    const log = t ? [...d.log, {at:now, action:'edit', number:newNumber, detail}] : d.log;
-    return {orders, seq:d.seq, log};
-  });
-}
-
-async function cancelOrder(id){
-  const t = state.orders.find(o=>o.id===id);
-  if(!t) return;
-  if(!confirm(`No.${t.number} の注文を取り消しますか？`)) return;
-  const now = Date.now();
-  await mutate(d=>({
-    orders: d.orders.filter(o=>o.id!==id),
-    seq: d.seq,
-    log: [...d.log, {at:now, action:'cancel', number:t.number, detail:itemsText(t.items)}],
-  }));
-}
-
-async function resetAll(){
-  if(!confirm('全ての注文データを削除します。よろしいですか？')) return;
-  const alsoLog = confirm('入力履歴（ログ）も一緒に削除しますか？\n\nOK＝ログも削除 / キャンセル＝注文だけ削除して履歴は残す');
-  knownIds = new Set();
-  await mutate(d=>({orders:[], seq:0, log: alsoLog?[]:d.log}));
-}
-
-// ===== 描画 =====
-function render(){
-  const root = document.getElementById('root');
-  // 再描画で入力中のフォーカスが飛ばないよう控えておく
-  const active = document.activeElement;
-  let focusKey = null, selStart = null, selEnd = null;
-  if(active && active.tagName==='INPUT' && active.dataset && active.dataset.focusKey){
-    focusKey = active.dataset.focusKey;
-    try{ selStart=active.selectionStart; selEnd=active.selectionEnd; }catch(e){}
-  }
-  root.innerHTML = '';
-  if(!state.role){ root.appendChild(roleSelect()); }
-  else if(state.role==='order'){ root.appendChild(topbar('注文入力')); root.appendChild(orderScreen()); }
-  else { root.appendChild(topbar('焼き台')); root.appendChild(grillScreen()); }
-  if(state.editing) root.appendChild(editModal());
-  if(focusKey){
-    const again = root.querySelector('input[data-focus-key="'+focusKey+'"]');
-    if(again){ again.focus({preventScroll:true}); if(selStart!==null){ try{ again.setSelectionRange(selStart,selEnd); }catch(e){} } }
-  }
-}
-
-function topbar(label){
-  return el('div',{class:'topbar'},[
-    el('div',{class:'brand'},[
-      el('div',{class:'mark'},'🍢'),
-      el('div',{},[ el('div',{class:'title'},'焼き鳥注文システム'), el('div',{class:'subtitle'},'学校祭 出店') ]),
-    ]),
-    el('div',{style:'display:flex;align-items:center;gap:8px;'},[
-      el('div',{class:'role-badge'},label),
-      el('button',{class:'switch-btn', onClick:()=>{state.role=null; render();}},'役割変更'),
-    ]),
-  ]);
-}
-
-function roleSelect(){
-  return el('div',{class:'select-screen'},[
-    el('div',{class:'select-hero'},[
-      el('div',{class:'kanji'},'祭 · 焼 · 提'),
-      el('h1',{},'焼き鳥注文システム'),
-      el('p',{},'このスマホの役割を選んでください'),
-    ]),
-    el('div',{class:'role-options'},[
-      el('div',{class:'role-card order', onClick:()=>{state.role='order'; render();}},[
-        el('div',{class:'role-icon'},'📋'),
-        el('div',{},[ el('div',{class:'role-name'},'注文入力'), el('div',{class:'role-desc'},'お客さんの注文を入力する') ]),
-      ]),
-      el('div',{class:'role-card grill', onClick:()=>{state.role='grill'; render();}},[
-        el('div',{class:'role-icon'},'🔥'),
-        el('div',{},[ el('div',{class:'role-name'},'焼き台'), el('div',{class:'role-desc'},'注文を見て焼く・完了する') ]),
-      ]),
-    ]),
-    el('button',{class:'reset-link', onClick:resetAll},'（本番前テスト用）全データを削除'),
-  ]);
-}
-
-// ---- 注文入力画面 ----
-function orderScreen(){
-  const screen = el('div',{class:'screen'});
-  const doneOrders = state.orders.filter(o=>o.status==='done').sort((a,b)=>b.doneAt-a.doneAt);
-  const cooking = state.orders.filter(o=>o.status==='new').sort((a,b)=>a.createdAt-b.createdAt);
-
-  // 完了バナー（入力欄より上、見やすく）
-  if(doneOrders.length){
-    const banner = el('div',{class:'done-banner'},[
-      el('div',{class:'done-head'},[ el('span',{class:'done-pulse'},'✅'), el('span',{},`焼き上がり（${doneOrders.length}件）お客様にお渡し`) ]),
-    ]);
-    doneOrders.forEach(o=>{
-      banner.appendChild(el('div',{class:'done-row'},[
-        el('div',{class:'done-left'},[
-          el('div',{class:'done-num'},String(o.number)),
-          el('div',{class:'done-items'}, itemsText(o.items)),
-        ]),
-        el('button',{class:'done-btn', onClick:()=>cancelOrder(o.id)},'お渡し完了'),
-      ]));
-    });
-    screen.appendChild(banner);
-  }
-
-  // 注文番号
-  screen.appendChild(el('div',{class:'section-label'},'注文番号'));
-  const num = state.orderNumber.trim();
-  const dupe = num!=='' && state.orders.some(o=>String(o.number)===num);
-  screen.appendChild(el('input',{
-    class:'num-input'+(dupe?' is-dupe':''),
-    type:'text', inputmode:'numeric', placeholder:'例: 12',
-    value: state.orderNumber, 'data-focus-key':'ordernum',
-    onInput:(e)=>{ state.orderNumber=e.target.value; updateNumberUi(); },
-  }));
-  screen.appendChild(el('div',{class:'num-warn'+(dupe?'':' is-hidden')},'⚠ この番号は現在対応中の注文で使われています'));
-
-  // メニュー
-  screen.appendChild(el('div',{class:'section-label'},'メニューを選ぶ'));
-  const grid = el('div',{class:'menu-grid'});
+// 「塩コショウ×2　タレ5本セット×1」→ {塩コショウ:2, タレ5本セット:1}
+function parseItemsText(text){
+  const result = {};
+  if(!text) return result;
+  // 訂正ログは「変更前 → 変更後」なので、矢印があれば後半（最終内容）を採用
+  const finalPart = text.includes('→') ? text.split('→').pop() : text;
   MENU.forEach(m=>{
-    const q = state.cart[m.name]||0;
-    grid.appendChild(el('div',{class:'menu-item'},[
-      el('div',{class:'mname'},m.name),
-      el('div',{class:'mprice'}, m.price+'円'),
-      el('div',{class:'stepper'},[
-        el('button',{onClick:()=>{state.cart[m.name]=Math.max(0,q-1); render();}},'−'),
-        el('div',{class:'qty'},String(q)),
-        el('button',{class:'plus', onClick:()=>{state.cart[m.name]=q+1; render();}},'＋'),
-      ]),
-    ]));
+    // 「商品名×数量」を拾う（商品名にメタ文字が無い前提でエスケープ）
+    const esc = m.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re = new RegExp(esc + '×(\\d+)', 'g');
+    let match, sum = 0;
+    while((match = re.exec(finalPart)) !== null){ sum += parseInt(match[1],10); }
+    if(sum>0) result[m.name] = sum;
   });
-  screen.appendChild(grid);
-
-  // 待ち時間予測（今から注文するお客さんの目安）
-  screen.appendChild(waitEstimateBox('今から注文の場合の目安: ', pendingSkewers()));
-
-  // 調理中の注文（訂正・取消できる）
-  screen.appendChild(el('div',{class:'section-label'},`調理中の注文（${cooking.length}件）`));
-  if(cooking.length===0){
-    screen.appendChild(el('div',{class:'empty-state'},'調理中の注文はありません'));
-  }else{
-    cooking.forEach(o=>{
-      screen.appendChild(el('div',{class:'ticket status-new'},[
-        el('div',{class:'ticket-top'},[
-          el('div',{class:'ticket-num'},String(o.number)),
-          el('div',{class:'ticket-time', 'data-elapsed':String(o.createdAt)}, elapsed(o.createdAt)),
-        ]),
-        el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
-        el('div',{class:'ticket-sub-actions'},[
-          el('button',{onClick:()=>openEdit(o.id)},'✏️ 訂正'),
-          el('button',{class:'danger', onClick:()=>cancelOrder(o.id)},'取消'),
-        ]),
-      ]));
-    });
-  }
-
-  // 履歴
-  screen.appendChild(el('button',{class:'history-toggle', onClick:()=>{state.showLog=!state.showLog; render();}},
-    state.showLog?'入力履歴を隠す':`入力履歴を表示（${state.log.length}件）`));
-  if(state.showLog){
-    const box = el('div',{});
-    [...state.log].reverse().slice(0,50).forEach(l=>{
-      const label = {create:'新規',edit:'訂正',done:'完了',cancel:'取消'}[l.action]||l.action;
-      box.appendChild(el('div',{class:'log-item'},[
-        el('span',{class:'log-time'}, timeStr(l.at)+'  '),
-        el('span',{class:'log-act '+l.action}, `[${label}] No.${l.number} `),
-        document.createTextNode(l.detail||''),
-      ]));
-    });
-    screen.appendChild(box);
-  }
-
-  // カートバー
-  const cnt = cartCount(state.cart);
-  const numReady = state.orderNumber.trim()!=='';
-  const bar = el('div',{class:'cart-bar'},[
-    el('div',{class:'cart-info'},[
-      numReady
-        ? el('div',{class:'cart-num'}, 'No.'+state.orderNumber.trim())
-        : el('div',{class:'cart-num is-empty'}, '番号を入力'),
-      el('div',{},[
-        document.createTextNode('選択中: '), el('b',{},cnt+'点'),
-        document.createTextNode('　合計 '), el('b',{}, cartTotal(state.cart).toLocaleString()+'円'),
-      ]),
-    ]),
-    el('button',{class:'submit-btn', disabled: (cnt===0||!numReady), onClick:submitOrder},'注文を送信'),
-  ]);
-  const wrap = el('div',{});
-  wrap.appendChild(screen); wrap.appendChild(bar);
-  return wrap;
+  return result;
 }
 
-// 番号入力中はフルレンダーせず、関係する部分だけ更新（フォーカス維持）
-function updateNumberUi(){
-  const num = state.orderNumber.trim();
-  const dupe = num!=='' && state.orders.some(o=>String(o.number)===num);
-  const input = document.querySelector('.num-input');
-  if(input) input.classList.toggle('is-dupe', dupe);
-  const warn = document.querySelector('.num-warn');
-  if(warn) warn.classList.toggle('is-hidden', !dupe);
-  const cnt = cartCount(state.cart);
-  const btn = document.querySelector('.submit-btn');
-  if(btn) btn.disabled = (cnt===0 || num==='');
-}
-
-// ---- 焼き台画面 ----
-function grillScreen(){
-  const screen = el('div',{class:'screen'});
-  const cooking = state.orders.filter(o=>o.status==='new').sort((a,b)=>a.createdAt-b.createdAt);
-
-  screen.appendChild(waitEstimateBox('今抱えている注文の消化目安: ', pendingSkewers()));
-
-  screen.appendChild(el('div',{class:'section-label'},`焼く注文（${cooking.length}件）`));
-  if(cooking.length===0){
-    screen.appendChild(el('div',{class:'empty-state'},'新しい注文はありません'));
-  }else{
-    cooking.forEach(o=>{
-      screen.appendChild(el('div',{class:'ticket status-new'},[
-        el('div',{class:'ticket-top'},[
-          el('div',{class:'ticket-num'},String(o.number)),
-          el('div',{class:'ticket-time', 'data-elapsed':String(o.createdAt)}, elapsed(o.createdAt)),
-        ]),
-        el('div',{class:'ticket-items', html: itemsHtml(o.items) + (o.edited?'<span class="ticket-edited">訂正済</span>':'')}),
-        el('button',{class:'ticket-action done', onClick:()=>markDone(o.id)},'焼き上がり・完了'),
-      ]));
-    });
-  }
-  return screen;
-}
-
-// 待ち時間予測ボックス
-function waitEstimateBox(label, skewers){
-  const avg = avgSecPerSkewer();
-  const usingDefault = avg===null;
-  const secPer = usingDefault ? DEFAULT_SEC_PER_SKEWER : avg;
-  const seconds = skewers * secPer;
-  return el('div',{class:'wait-box'+(usingDefault?' is-default':'')},[
-    el('div',{class:'wait-main'},[
-      el('span',{},'⏱ '),
-      el('span',{class:'wait-label'}, label),
-      el('span',{class:'wait-value'}, skewers===0 ? '待ちなし' : formatWait(seconds)),
-    ]),
-    el('div',{class:'wait-sub'}, usingDefault
-      ? `実績収集中のため仮の目安（1本${DEFAULT_SEC_PER_SKEWER}秒換算・残り${skewers}本）`
-      : `実績平均：1本あたり約${Math.round(avg)}秒（残り${skewers}本）`),
-  ]);
-}
-
-// ---- 訂正モーダル ----
-function openEdit(id){
-  const o = state.orders.find(x=>x.id===id);
-  if(!o) return;
-  const cart = {};
-  o.items.forEach(i=>{ cart[i.name] = i.qty; });
-  state.editing = {id, cart, number: String(o.number)};
-  render();
-}
-
-function editModal(){
-  const o = state.orders.find(x=>x.id===state.editing.id);
-  if(!o){ state.editing=null; return el('div',{}); }
-  const cart = state.editing.cart;
-
-  // 番号の重複チェック（自分以外で同じ番号があるか）
-  const num = (state.editing.number||'').trim();
-  const dupe = num!=='' && state.orders.some(x=>x.id!==o.id && String(x.number)===num);
-
-  const grid = el('div',{class:'menu-grid'});
-  MENU.forEach(m=>{
-    const q = cart[m.name]||0;
-    grid.appendChild(el('div',{class:'menu-item'},[
-      el('div',{class:'mname'},m.name),
-      el('div',{class:'mprice'}, m.price+'円'),
-      el('div',{class:'stepper'},[
-        el('button',{onClick:()=>{cart[m.name]=Math.max(0,q-1); render();}},'−'),
-        el('div',{class:'qty'},String(q)),
-        el('button',{class:'plus', onClick:()=>{cart[m.name]=q+1; render();}},'＋'),
-      ]),
-    ]));
-  });
-
-  const numInput = el('input',{
-    class:'num-input'+(dupe?' is-dupe':''),
-    type:'text', inputmode:'numeric', placeholder:'注文番号',
-    value: state.editing.number, 'data-focus-key':'editnum',
-    onInput:(e)=>{ state.editing.number = e.target.value; updateEditNumUi(); },
-  });
-
-  return el('div',{class:'modal-back', onClick:(e)=>{ if(e.target.classList.contains('modal-back')){state.editing=null; render();} }},[
-    el('div',{class:'modal'},[
-      el('div',{class:'modal-title'},`No.${o.number} を訂正`),
-      el('div',{class:'modal-sub'},'番号や数量を直して保存すると、焼き台にすぐ反映されます'),
-      el('div',{class:'section-label', style:'margin-top:0;'},'注文番号'),
-      numInput,
-      el('div',{class:'num-warn edit-num-warn'+(dupe?'':' is-hidden')},'⚠ この番号は他の対応中の注文で使われています'),
-      el('div',{class:'section-label'},'内容'),
-      grid,
-      el('div',{class:'modal-actions'},[
-        el('button',{class:'modal-cancel', onClick:()=>{state.editing=null; render();}},'やめる'),
-        el('button',{class:'modal-save', onClick:()=>saveEdit(o.id, cartToItems(cart), state.editing.number)},'保存'),
-      ]),
-    ]),
-  ]);
-}
-
-// 訂正モーダルの番号入力中に、重複警告だけを軽く更新（フォーカス維持）
-function updateEditNumUi(){
-  if(!state.editing) return;
-  const num = (state.editing.number||'').trim();
-  const o = state.orders.find(x=>x.id===state.editing.id);
-  const dupe = num!=='' && o && state.orders.some(x=>x.id!==o.id && String(x.number)===num);
-  const input = document.querySelector('.modal .num-input');
-  if(input) input.classList.toggle('is-dupe', dupe);
-  const warn = document.querySelector('.edit-num-warn');
-  if(warn) warn.classList.toggle('is-hidden', !dupe);
-}
-
-// ===== 起動 =====
-render();
-poll();
-setInterval(poll, 2500);
-
-// 1秒ごと：全体は再描画せず、経過時間の表示だけ書き換える（チラつき防止）
-setInterval(()=>{
-  state.now = Date.now();
-  if(!state.role) return;
-  document.querySelectorAll('.ticket-time[data-elapsed]').forEach(elm=>{
-    const ts = Number(elm.getAttribute('data-elapsed'));
-    if(ts) elm.textContent = elapsed(ts);
-  });
-}, 1000);
-</script>
-</body>
-</html>
+// ログから「最終的に成立した注文」を番号ごとに集計する。
+// create→edit（最新内容で上書き）→cancel（除外）を追跡し、商品別の提供数・売上を返す。
+function aggregateSales(){
+  const perNumber = {}; // number → {items:{name:qty}, cancelled:bool, lastAt}
+  [...state.log].sort((a,b)=>a.at-b.at).forEach(l=>{
+    const key = String(l.number);
+    if(l.action==='create'){
+      perNumber[key] = {items: parseItemsText(l.detail), cancelled:false, lastAt:l.at};
+    }else if(l.action==='edit'){
+      if(!perNumber[key
